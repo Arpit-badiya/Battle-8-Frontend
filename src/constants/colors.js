@@ -1,0 +1,28 @@
+const colors = {
+  background: '#030608',
+  backgroundSoft: '#071014',
+  surface: 'rgba(8, 15, 18, 0.92)',
+  surfaceElevated: 'rgba(13, 24, 28, 0.94)',
+  surfaceMuted: '#111b20',
+  border: 'rgba(107, 255, 28, 0.22)',
+  borderSoft: 'rgba(255, 255, 255, 0.08)',
+  text: '#f6f8fb',
+  textMuted: '#aeb5bd',
+  textDim: '#6f7880',
+  primary: '#55ff17',
+  primaryDark: '#159c00',
+  primarySoft: 'rgba(85, 255, 23, 0.16)',
+  primaryGlow: 'rgba(85, 255, 23, 0.5)',
+  coin: '#ffbf18',
+  coinDark: '#f18a00',
+  coinSoft: 'rgba(255, 191, 24, 0.18)',
+  purple: '#742ff0',
+  purpleDark: '#231040',
+  danger: '#ff3d31',
+  warning: '#ff9f1c',
+  tabInactive: '#98a0aa',
+  black: '#000000',
+  white: '#ffffff',
+};
+
+export default colors;
