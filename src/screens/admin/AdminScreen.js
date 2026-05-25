@@ -1,7 +1,10 @@
 import { useFocusEffect } from '@react-navigation/native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Button from '../../components/common/Button';
+import BrandLogo from '../../components/common/BrandLogo';
 import GlassCard from '../../components/common/GlassCard';
 import Header from '../../components/common/Header';
 import Screen from '../../components/common/Screen';
@@ -13,6 +16,8 @@ import {
   createPlayer,
   getAdminDashboard,
   getAdminLeaderboard,
+  importContestPlayers,
+  importContestResults,
   processResults,
   updateContestPlayers,
 } from '../../services/adminService';
@@ -49,6 +54,24 @@ const getId = (item = {}) => String(item.id || item._id || item);
 const calculateFantasyPoints = (kills, placement) =>
   Math.max(0, Number(kills || 0)) * 4 + (placementPoints[Number(placement)] || 0);
 
+const formatDateTime = (value) => {
+  if (!value) return 'Select date and time';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Select date and time';
+  return date.toLocaleString([], {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+};
+
+const getPickerDate = (value) => {
+  const date = value ? new Date(value) : new Date(Date.now() + 60 * 60 * 1000);
+  return Number.isNaN(date.getTime()) ? new Date(Date.now() + 60 * 60 * 1000) : date;
+};
+
 const Field = ({ label, value, onChangeText, placeholder, keyboardType = 'default' }) => (
   <View style={styles.field}>
     <Text style={styles.label}>{label}</Text>
@@ -60,6 +83,17 @@ const Field = ({ label, value, onChangeText, placeholder, keyboardType = 'defaul
       keyboardType={keyboardType}
       style={styles.input}
     />
+  </View>
+);
+
+const DateTimeField = ({ label, value, onPress }) => (
+  <View style={styles.field}>
+    <Text style={styles.label}>{label}</Text>
+    <Pressable onPress={onPress} style={styles.dateButton}>
+      <Text numberOfLines={1} style={[styles.dateText, !value && styles.datePlaceholder]}>
+        {formatDateTime(value)}
+      </Text>
+    </Pressable>
   </View>
 );
 
@@ -75,6 +109,8 @@ const AdminScreen = ({ navigation }) => {
   const [playerSearch, setPlayerSearch] = useState('');
   const [leaderboard, setLeaderboard] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [picker, setPicker] = useState(null);
+  const [importSummary, setImportSummary] = useState(null);
 
   const selectedContest = useMemo(
     () => contests.find((contest) => getId(contest) === selectedContestId),
@@ -203,6 +239,47 @@ const AdminScreen = ({ navigation }) => {
     }
   };
 
+  const handleDateChange = (event, selectedDate) => {
+    if (!picker) return;
+
+    if (Platform.OS === 'android' && event.type === 'dismissed') {
+      setPicker(null);
+      return;
+    }
+
+    const currentDate = selectedDate || getPickerDate(contestForm[picker.field]);
+    const nextDate = new Date(getPickerDate(contestForm[picker.field]));
+
+    if (picker.mode === 'datetime') {
+      nextDate.setTime(currentDate.getTime());
+    } else if (picker.mode === 'date') {
+      nextDate.setFullYear(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate());
+    } else {
+      nextDate.setHours(currentDate.getHours(), currentDate.getMinutes(), 0, 0);
+    }
+
+    setContestForm((current) => ({
+      ...current,
+      [picker.field]: nextDate.toISOString(),
+    }));
+
+    if (Platform.OS === 'android' && picker.mode === 'date') {
+      setPicker({ ...picker, mode: 'time' });
+      return;
+    }
+
+    if (Platform.OS === 'android') {
+      setPicker(null);
+    }
+  };
+
+  const openDatePicker = (field) => {
+    setPicker({
+      field,
+      mode: Platform.OS === 'ios' ? 'datetime' : 'date',
+    });
+  };
+
   const submitContestPlayers = async () => {
     if (!selectedContestId) {
       Alert.alert('Contest required', 'Select a contest first.');
@@ -307,10 +384,78 @@ const AdminScreen = ({ navigation }) => {
     }
   };
 
+  const pickImportFile = async (type) => {
+    if (!selectedContestId) {
+      Alert.alert('Contest required', 'Select a contest before importing a file.');
+      return;
+    }
+
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: [
+          'text/csv',
+          'application/vnd.ms-excel',
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ],
+        copyToCacheDirectory: true,
+        multiple: false,
+      });
+
+      if (result.canceled || !result.assets?.[0]) {
+        return;
+      }
+
+      setSaving(true);
+      const file = result.assets[0];
+      const response =
+        type === 'players'
+          ? await importContestPlayers({ contestId: selectedContestId, file })
+          : await importContestResults({ contestId: selectedContestId, file });
+
+      setImportSummary(response.summary || null);
+
+      if (type === 'players') {
+        await Promise.all([
+          refreshPlayers({ silent: true }),
+          refreshContests({ silent: true }),
+        ]);
+        const scopedPlayers = await getContestPlayers(selectedContestId);
+        setContestPlayers(scopedPlayers);
+        setContestPlayerIds(scopedPlayers.map(getId));
+        showSuccess('Player file imported');
+      } else {
+        const rows = response.leaderboard || await getAdminLeaderboard(selectedContestId);
+        setLeaderboard(rows);
+        await Promise.all([
+          refreshContests({ silent: true }),
+          refreshLeaderboard(selectedContestId, { silent: true }),
+        ]);
+        showSuccess('Result file processed');
+      }
+    } catch (error) {
+      const importErrors = error?.data?.details?.errors || error?.details?.errors;
+      if (importErrors?.length) {
+        Alert.alert('Import failed', importErrors.slice(0, 5).map((item) => `Line ${item.line}: ${item.message}`).join('\n'));
+        return;
+      }
+      showError(type === 'players' ? 'Player import failed' : 'Result import failed', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <Screen>
       <Header title="Admin" onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <View style={styles.brandHeader}>
+          <BrandLogo size={44} glow />
+          <View style={styles.brandCopy}>
+            <Text style={styles.brandTitle}>Battle-8 Control</Text>
+            <Text style={styles.brandSub}>Contests, imports, results and payouts</Text>
+          </View>
+        </View>
+
         <GlassCard style={styles.stats}>
           {[
             ['Users', dashboard?.totalUsers ?? 0],
@@ -333,8 +478,8 @@ const AdminScreen = ({ navigation }) => {
             <Field label="Entry" keyboardType="number-pad" value={contestForm.entryFee} onChangeText={(entryFee) => setContestForm((current) => ({ ...current, entryFee }))} />
           </View>
           <Field label="Commission %" keyboardType="decimal-pad" value={contestForm.platformCommissionPercent} onChangeText={(platformCommissionPercent) => setContestForm((current) => ({ ...current, platformCommissionPercent }))} />
-          <Field label="Start Time" value={contestForm.startTime} placeholder="2026-05-22T20:00:00+05:30" onChangeText={(startTime) => setContestForm((current) => ({ ...current, startTime }))} />
-          <Field label="Estimated End" value={contestForm.estimatedEndTime} placeholder="Optional ISO time" onChangeText={(estimatedEndTime) => setContestForm((current) => ({ ...current, estimatedEndTime }))} />
+          <DateTimeField label="Start Time" value={contestForm.startTime} onPress={() => openDatePicker('startTime')} />
+          <DateTimeField label="Estimated End" value={contestForm.estimatedEndTime} onPress={() => openDatePicker('estimatedEndTime')} />
           <View style={styles.accountingBox}>
             <Text style={styles.accountingText}>Collection: {accountingPreview.totalCollection.toFixed(2)}</Text>
             <Text style={styles.accountingText}>Commission: {accountingPreview.commissionAmount.toFixed(2)}</Text>
@@ -374,6 +519,9 @@ const AdminScreen = ({ navigation }) => {
           <Text style={styles.statusLine}>
             {(selectedContest?.status || 'upcoming').toUpperCase()} | {contestPlayerIds.length} players selected
           </Text>
+          <View style={styles.importRow}>
+            <Button title="Import CSV/XLSX" variant="outline" loading={saving} disabled={saving || selectedContest?.status !== 'upcoming'} onPress={() => pickImportFile('players')} />
+          </View>
           <View style={styles.chipWrap}>
             {filteredPlayers.map((player) => {
               const playerId = getId(player);
@@ -393,6 +541,14 @@ const AdminScreen = ({ navigation }) => {
 
         <GlassCard style={styles.panel}>
           <Text style={styles.panelTitle}>Complete Match</Text>
+          <Button title="Import Result File" variant="outline" loading={saving} disabled={saving || !selectedContestId || selectedContest?.status === 'completed'} onPress={() => pickImportFile('results')} />
+          {importSummary && (
+            <View style={styles.importSummary}>
+              <Text style={styles.accountingText}>Rows: {importSummary.rows ?? 0}</Text>
+              <Text style={styles.accountingText}>Processed: {importSummary.processed ?? importSummary.imported ?? 0}</Text>
+              <Text style={styles.accountingText}>Created: {importSummary.created ?? 0}</Text>
+            </View>
+          )}
           {contestPlayers.length === 0 ? (
             <Text style={styles.emptyText}>Select a contest with configured players.</Text>
           ) : (
@@ -436,6 +592,15 @@ const AdminScreen = ({ navigation }) => {
             </View>
           ))}
         </GlassCard>
+        {picker && (
+          <DateTimePicker
+            value={getPickerDate(contestForm[picker.field])}
+            mode={picker.mode}
+            display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+            minimumDate={new Date()}
+            onChange={handleDateChange}
+          />
+        )}
       </ScrollView>
     </Screen>
   );
@@ -446,6 +611,26 @@ const styles = StyleSheet.create({
     padding: spacing.screen,
     paddingBottom: 112,
     gap: spacing.md,
+  },
+  brandHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  brandCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  brandTitle: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  brandSub: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
   },
   stats: {
     flexDirection: 'row',
@@ -499,6 +684,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     fontWeight: '800',
   },
+  dateButton: {
+    minHeight: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  dateText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  datePlaceholder: {
+    color: colors.textDim,
+  },
   accountingBox: {
     borderRadius: 10,
     borderWidth: 1,
@@ -548,6 +750,17 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 13,
     fontWeight: '900',
+  },
+  importRow: {
+    gap: spacing.sm,
+  },
+  importSummary: {
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: 'rgba(177,255,0,0.06)',
+    borderRadius: 10,
+    padding: spacing.md,
+    gap: spacing.xs,
   },
   emptyText: {
     color: colors.textMuted,

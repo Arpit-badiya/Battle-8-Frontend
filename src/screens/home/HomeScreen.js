@@ -24,23 +24,25 @@ const categories = [
   { label: 'Practice', icon: 'game-controller' },
 ];
 
-const Hero = () => (
-  <GlassCard style={styles.hero} glow>
+const Hero = ({ onPress }) => (
+  <Pressable onPress={onPress}>
+    <GlassCard style={styles.hero} glow>
     <View style={styles.heroSparkOne} />
     <View style={styles.heroSparkTwo} />
     <View style={styles.heroCopy}>
       <Text style={styles.heroTitle}>CREATE YOUR TEAM</Text>
       <Text style={styles.heroTitle}>JOIN CONTESTS</Text>
       <Text style={styles.heroWin}>WIN COINS</Text>
-      <Pressable style={styles.playNow}>
+      <View style={styles.playNow}>
         <Text style={styles.playNowText}>PLAY NOW</Text>
-      </Pressable>
+      </View>
     </View>
     <View style={styles.heroSoldiers}>
       <GameAvatar name="A" size={74} />
       <GameAvatar name="B" size={74} />
     </View>
-  </GlassCard>
+    </GlassCard>
+  </Pressable>
 );
 
 const HomeScreen = ({ navigation }) => {
@@ -110,7 +112,9 @@ const HomeScreen = ({ navigation }) => {
         <NetworkBanner network={network} />
         <View style={styles.topBar}>
           <View style={styles.greeting}>
-            <GameAvatar name={displayName} size={46} />
+            <Pressable onPress={() => navigation.navigate('Profile')} hitSlop={10}>
+              <GameAvatar name={displayName} size={46} />
+            </Pressable>
             <View>
               <Text style={styles.hello}>Hello, {displayName}</Text>
               <Text style={styles.rankLabel}>Pro Player</Text>
@@ -118,15 +122,25 @@ const HomeScreen = ({ navigation }) => {
           </View>
           <View style={styles.actions}>
             <CoinBadge amount={user?.coins ?? 0} />
-            <Pressable style={styles.addCoin}>
+            <Pressable style={styles.addCoin} onPress={() => navigation.navigate('Wallet')}>
               <Ionicons name="add" size={22} color={colors.white} />
             </Pressable>
           </View>
         </View>
 
         <AnimatedView>
-          <Hero />
+          <Hero onPress={() => navigation.navigate('MyContests')} />
         </AnimatedView>
+
+        <GlassCard style={styles.coinComingSoon}>
+          <View style={styles.coinIcon}>
+            <Ionicons name="wallet" size={22} color={colors.coin} />
+          </View>
+          <View style={styles.coinCopy}>
+            <Text style={styles.coinTitle}>Add Coins</Text>
+            <Text style={styles.coinSub}>Coin system/payment gateway coming soon</Text>
+          </View>
+        </GlassCard>
 
         <View style={styles.categoryRow}>
           {categories.map((item, index) => (
@@ -266,6 +280,39 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     backgroundColor: 'rgba(85, 255, 23, 0.08)',
+  },
+  coinComingSoon: {
+    marginTop: spacing.md,
+    minHeight: 68,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: spacing.md,
+  },
+  coinIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,191,24,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,191,24,0.2)',
+  },
+  coinCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  coinTitle: {
+    color: colors.text,
+    fontSize: 14,
+    fontWeight: '900',
+  },
+  coinSub: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
   },
   categoryRow: {
     flexDirection: 'row',

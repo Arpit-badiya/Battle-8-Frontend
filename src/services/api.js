@@ -2,11 +2,11 @@ import axios from 'axios';
 
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ||
-  'http://10.102.106.80:5000/api';
+  'http://10.153.25.80:5000/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 15000,
+  timeout: 60000,
   headers: {
     'Content-Type': 'application/json',
   },

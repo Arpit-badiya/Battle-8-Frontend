@@ -66,6 +66,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [pendingEmail, setPendingEmail] = useState('');
+  const [pendingReferralCode, setPendingReferralCode] = useState('');
   const [booting, setBooting] = useState(true);
   const [loading, setLoading] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
@@ -114,22 +115,24 @@ export const AuthProvider = ({ children }) => {
     return () => setUnauthorizedHandler(null);
   }, [clearSession]);
 
-  const sendOtp = useCallback(async (email) => {
+  const sendOtp = useCallback(async (email, referralCode = '') => {
     setLoading(true);
     try {
       const response = await requestOtp(email);
       setPendingEmail(email.trim().toLowerCase());
+      setPendingReferralCode(referralCode.trim().toUpperCase());
       return response;
     } finally {
       setLoading(false);
     }
   }, []);
 
-  const verifyOtp = useCallback(async (otp, emailOverride) => {
+  const verifyOtp = useCallback(async (otp, emailOverride, referralOverride) => {
     setLoading(true);
     try {
       const email = emailOverride || pendingEmail;
-      const response = await requestVerifyOtp(email, otp);
+      const referralCode = referralOverride || pendingReferralCode;
+      const response = await requestVerifyOtp(email, otp, referralCode);
       const nextUser = response.user;
       const nextToken = response.token;
 
@@ -141,7 +144,7 @@ export const AuthProvider = ({ children }) => {
     } finally {
       setLoading(false);
     }
-  }, [pendingEmail]);
+  }, [pendingEmail, pendingReferralCode]);
 
   const logout = useCallback(async () => {
     await clearSession();
@@ -213,6 +216,7 @@ export const AuthProvider = ({ children }) => {
       user,
       token,
       pendingEmail,
+      pendingReferralCode,
       booting,
       loading,
       profileLoading,
@@ -225,7 +229,7 @@ export const AuthProvider = ({ children }) => {
       refreshProfile,
       updateProfile,
     }),
-    [user, token, pendingEmail, booting, loading, profileLoading, sendOtp, verifyOtp, logout, updateCoins, refreshProfile, updateProfile]
+    [user, token, pendingEmail, pendingReferralCode, booting, loading, profileLoading, sendOtp, verifyOtp, logout, updateCoins, refreshProfile, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

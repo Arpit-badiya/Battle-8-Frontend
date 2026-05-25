@@ -7,6 +7,8 @@ import useAuth from '../hooks/useAuth';
 import { showError, showSuccess } from '../utils/feedback';
 import LoginScreen from '../screens/auth/LoginScreen';
 import OtpScreen from '../screens/auth/OtpScreen';
+import HelpSupportScreen from '../screens/profile/HelpSupportScreen';
+import TermsScreen from '../screens/profile/TermsScreen';
 import TeamBuilderScreen from '../screens/team/TeamBuilderScreen';
 import BottomTabs from './BottomTabs';
 
@@ -46,6 +48,8 @@ const AppNavigator = () => {
           <>
             <Stack.Screen name="MainTabs" component={BottomTabs} />
             <Stack.Screen name="TeamBuilder" component={TeamBuilderScreen} />
+            <Stack.Screen name="Terms" component={TermsScreen} />
+            <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
           </>
         ) : (
           <>

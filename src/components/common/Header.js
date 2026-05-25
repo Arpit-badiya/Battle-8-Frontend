@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import BrandLogo from './BrandLogo';
 import colors from '../../constants/colors';
 import spacing from '../../constants/spacing';
 
-const Header = ({ title, onBack, right, centered = true }) => (
+const Header = ({ title, onBack, right, centered = true, branded = false }) => (
   <View style={styles.header}>
     <View style={styles.side}>
       {onBack && (
@@ -11,6 +12,7 @@ const Header = ({ title, onBack, right, centered = true }) => (
           <Ionicons name="chevron-back" size={28} color={colors.text} />
         </Pressable>
       )}
+      {!onBack && branded && <BrandLogo size={32} />}
     </View>
     <Text style={[styles.title, !centered && styles.leftTitle]}>{title}</Text>
     <View style={[styles.side, styles.right]}>{right}</View>

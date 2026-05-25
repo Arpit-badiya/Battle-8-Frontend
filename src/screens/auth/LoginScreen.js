@@ -3,6 +3,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BrandLogo from '../../components/common/BrandLogo';
 import Button from '../../components/common/Button';
 import colors from '../../constants/colors';
 import spacing from '../../constants/spacing';
@@ -11,6 +12,7 @@ import useAuth from '../../hooks/useAuth';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const { sendOtp, loading } = useAuth();
 
   const handleLogin = async () => {
@@ -21,8 +23,8 @@ const LoginScreen = ({ navigation }) => {
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
-      await sendOtp(normalizedEmail);
-      navigation.navigate('Otp', { email: normalizedEmail });
+      await sendOtp(normalizedEmail, referralCode);
+      navigation.navigate('Otp', { email: normalizedEmail, referralCode: referralCode.trim().toUpperCase() });
     } catch (error) {
       Alert.alert('OTP failed', error.message);
     }
@@ -33,7 +35,7 @@ const LoginScreen = ({ navigation }) => {
       <SafeAreaView style={styles.safe}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.content}>
           <View style={styles.brandMark}>
-            <Ionicons name="game-controller" size={42} color={colors.primary} />
+            <BrandLogo size={82} glow />
           </View>
           <Text style={styles.title}>Join Contests. Win Coins.</Text>
           <Text style={styles.subtitle}>Create your esports squad and enter live coin battles.</Text>
@@ -48,6 +50,18 @@ const LoginScreen = ({ navigation }) => {
                 autoCapitalize="none"
                 keyboardType="email-address"
                 placeholder="Enter Your Email"
+                placeholderTextColor={colors.textDim}
+                style={styles.input}
+              />
+            </View>
+            <Text style={styles.label}>Referral code (optional)</Text>
+            <View style={styles.inputWrap}>
+              <Ionicons name="gift" size={20} color={colors.textMuted} />
+              <TextInput
+                value={referralCode}
+                onChangeText={setReferralCode}
+                autoCapitalize="characters"
+                placeholder="Invite code"
                 placeholderTextColor={colors.textDim}
                 style={styles.input}
               />
@@ -75,12 +89,8 @@ const styles = StyleSheet.create({
   brandMark: {
     width: 82,
     height: 82,
-    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     marginBottom: spacing.xxl,
   },
   title: {

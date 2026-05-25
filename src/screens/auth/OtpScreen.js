@@ -1,8 +1,8 @@
-import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import BrandLogo from '../../components/common/BrandLogo';
 import Button from '../../components/common/Button';
 import Header from '../../components/common/Header';
 import colors from '../../constants/colors';
@@ -15,6 +15,7 @@ const OtpScreen = ({ navigation, route }) => {
   const inputs = useRef([]);
   const { verifyOtp, pendingEmail, loading } = useAuth();
   const email = pendingEmail || route.params?.email;
+  const referralCode = route.params?.referralCode;
 
   const handleChange = (value, index) => {
     const next = [...otp];
@@ -39,7 +40,7 @@ const OtpScreen = ({ navigation, route }) => {
     }
 
     try {
-      await verifyOtp(code, email);
+      await verifyOtp(code, email, referralCode);
     } catch (error) {
       Alert.alert('Verification failed', error.message);
     }
@@ -51,7 +52,7 @@ const OtpScreen = ({ navigation, route }) => {
         <Header title="" onBack={() => navigation.goBack()} />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.content}>
           <View style={styles.icon}>
-            <Ionicons name="shield-checkmark" size={38} color={colors.primary} />
+            <BrandLogo size={74} glow />
           </View>
           <Text style={styles.title}>Verify OTP</Text>
           <Text style={styles.subtitle}>Code sent to {email || 'your email'}</Text>
@@ -93,12 +94,8 @@ const styles = StyleSheet.create({
   icon: {
     width: 74,
     height: 74,
-    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
     marginBottom: spacing.xl,
   },
   title: {

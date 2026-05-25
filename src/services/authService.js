@@ -21,7 +21,8 @@ export const sendOtp = async (
 
 export const verifyOtp = async (
   email,
-  otp
+  otp,
+  referralCode
 ) => {
   const response =
     await api.post(
@@ -34,6 +35,9 @@ export const verifyOtp = async (
 
         otp:
           otp?.toString(),
+
+        referralCode:
+          referralCode?.trim(),
       }
     );
 
