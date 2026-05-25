@@ -38,18 +38,3 @@ export const getJoinProgress = (
     1
   );
 };
-
-export const getInitials = (
-  name = ''
-) =>
-  String(name)
-    .trim()
-    .split(' ')
-    .filter(Boolean)
-    .map(
-      (part) =>
-        part[0]
-    )
-    .join('')
-    .slice(0, 2)
-    .toUpperCase();

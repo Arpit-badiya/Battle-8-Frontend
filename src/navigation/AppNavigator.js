@@ -6,7 +6,6 @@ import NamePromptModal from '../components/profile/NamePromptModal';
 import useAuth from '../hooks/useAuth';
 import { showError, showSuccess } from '../utils/feedback';
 import LoginScreen from '../screens/auth/LoginScreen';
-import OtpScreen from '../screens/auth/OtpScreen';
 import HelpSupportScreen from '../screens/profile/HelpSupportScreen';
 import TermsScreen from '../screens/profile/TermsScreen';
 import TeamBuilderScreen from '../screens/team/TeamBuilderScreen';
@@ -52,10 +51,7 @@ const AppNavigator = () => {
             <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
           </>
         ) : (
-          <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Otp" component={OtpScreen} />
-          </>
+          <Stack.Screen name="Login" component={LoginScreen} />
         )}
       </Stack.Navigator>
       <NamePromptModal

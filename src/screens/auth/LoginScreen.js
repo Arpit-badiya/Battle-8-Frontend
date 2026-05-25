@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BrandLogo from '../../components/common/BrandLogo';
 import Button from '../../components/common/Button';
@@ -10,30 +10,22 @@ import spacing from '../../constants/spacing';
 import typography from '../../constants/typography';
 import useAuth from '../../hooks/useAuth';
 
-const LoginScreen = ({ navigation }) => {
-  const [email, setEmail] = useState('');
+const LoginScreen = () => {
   const [referralCode, setReferralCode] = useState('');
-  const { sendOtp, loading } = useAuth();
+  const { loginWithGoogle, loading } = useAuth();
 
-  const handleLogin = async () => {
-    if (!email.trim() || !email.includes('@')) {
-      Alert.alert('Invalid email', 'Enter a valid email to continue.');
-      return;
-    }
-
+  const handleGoogleLogin = async () => {
     try {
-      const normalizedEmail = email.trim().toLowerCase();
-      await sendOtp(normalizedEmail, referralCode);
-      navigation.navigate('Otp', { email: normalizedEmail, referralCode: referralCode.trim().toUpperCase() });
+      await loginWithGoogle(referralCode);
     } catch (error) {
-      Alert.alert('OTP failed', error.message);
+      Alert.alert('Google sign-in failed', error?.message || 'Please try again.');
     }
   };
 
   return (
     <LinearGradient colors={[colors.background, '#04111c', colors.background]} style={styles.root}>
       <SafeAreaView style={styles.safe}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.content}>
+        <View style={styles.content}>
           <View style={styles.brandMark}>
             <BrandLogo size={82} glow />
           </View>
@@ -41,34 +33,29 @@ const LoginScreen = ({ navigation }) => {
           <Text style={styles.subtitle}>Create your esports squad and enter live coin battles.</Text>
 
           <View style={styles.panel}>
-            <Text style={styles.label}>Email address</Text>
-            <View style={styles.inputWrap}>
-              <Ionicons name="mail" size={20} color={colors.textMuted} />
-              <TextInput
-                value={email}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-                placeholder="Enter Your Email"
-                placeholderTextColor={colors.textDim}
-                style={styles.input}
-              />
-            </View>
-            <Text style={styles.label}>Referral code (optional)</Text>
+            <Text style={styles.panelTitle}>Welcome to Battle-8</Text>
+            <Text style={styles.panelSub}>Use your Google account to continue securely.</Text>
+
             <View style={styles.inputWrap}>
               <Ionicons name="gift" size={20} color={colors.textMuted} />
               <TextInput
                 value={referralCode}
                 onChangeText={setReferralCode}
                 autoCapitalize="characters"
-                placeholder="Invite code"
+                placeholder="Referral code (optional)"
                 placeholderTextColor={colors.textDim}
                 style={styles.input}
               />
             </View>
-            <Button title="Send OTP" loading={loading} onPress={handleLogin} />
+
+            <Button
+              title="Continue with Google"
+              loading={loading}
+              onPress={handleGoogleLogin}
+              icon={<Ionicons name="logo-google" size={18} color={colors.white} />}
+            />
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </SafeAreaView>
     </LinearGradient>
   );
@@ -115,10 +102,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     gap: spacing.lg,
   },
-  label: {
+  panelTitle: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '800',
+    fontSize: 18,
+    fontWeight: '900',
+  },
+  panelSub: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 20,
   },
   inputWrap: {
     height: 54,

@@ -20,14 +20,6 @@ const sleep = (ms) =>
 let authToken = null;
 let unauthorizedHandler = null;
 
-export const getApiErrorMessage = (error) => {
-  if (error?.message) {
-    return error.message;
-  }
-
-  return 'Something went wrong.';
-};
-
 export const normalizeApiError = (error) => {
   const status = error?.response?.status;
   const data = error?.response?.data;

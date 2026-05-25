@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/icon.png",
       "resizeMode": "contain",
@@ -22,14 +22,17 @@
         "backgroundColor": "#02070d"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.arpit_badiya.Frontend"
+      "package": "com.arpit_badiya.Frontend",
+      "googleServicesFile": "./android/app/google-services.json"
     },
     "web": {
       "favicon": "./assets/icon.png"
     },
     "plugins": [
-      "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "@react-native-firebase/app",
+      "@react-native-firebase/auth",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "eas": {

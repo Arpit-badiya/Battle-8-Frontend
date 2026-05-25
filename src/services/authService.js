@@ -1,56 +1,16 @@
-import api, {
-  setAuthToken,
-} from './api';
+import api, { setAuthToken } from './api';
 
-export const sendOtp = async (
-  email
-) => {
-  const response =
-    await api.post(
-      '/auth/send-otp',
-      {
-        email:
-          email
-            ?.trim()
-            ?.toLowerCase(),
-      }
-    );
+export const loginWithGoogleToken = async ({ firebaseIdToken, referralCode }) => {
+  const response = await api.post('/auth/google', {
+    firebaseIdToken,
+    referralCode: referralCode?.trim(),
+  });
 
-  return response.data;
-};
-
-export const verifyOtp = async (
-  email,
-  otp,
-  referralCode
-) => {
-  const response =
-    await api.post(
-      '/auth/verify-otp',
-      {
-        email:
-          email
-            ?.trim()
-            ?.toLowerCase(),
-
-        otp:
-          otp?.toString(),
-
-        referralCode:
-          referralCode?.trim(),
-      }
-    );
-
-  const token =
-    response?.data?.token;
-
-  const user =
-    response?.data?.user;
+  const token = response?.data?.token;
+  const user = response?.data?.user;
 
   if (!token || !user) {
-    throw new Error(
-      'Invalid login response received from server.'
-    );
+    throw new Error('Invalid login response received from server.');
   }
 
   setAuthToken(token);
