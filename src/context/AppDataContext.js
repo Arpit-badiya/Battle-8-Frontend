@@ -420,6 +420,8 @@ export const AppDataProvider = ({ children }) => {
     contestId,
     players: playerIds,
     totalCredits,
+    captain,
+    viceCaptain,
   }) => {
     if (
       creatingTeam ||
@@ -440,6 +442,8 @@ export const AppDataProvider = ({ children }) => {
       const response = await createTeamRequest({
         contestId,
         players: uniquePlayerIds,
+        captain,
+        viceCaptain,
         totalCredits,
       });
 

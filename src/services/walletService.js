@@ -64,10 +64,15 @@ export const getWallet =
       ...wallet,
 
       balance: Number(
-        wallet.balance ??
+        wallet.mainCoins ??
+          wallet.balance ??
           wallet.coins ??
           0
       ),
+
+      mainCoins: Number(wallet.mainCoins ?? wallet.balance ?? wallet.coins ?? 0),
+
+      winningCoins: Number(wallet.winningCoins ?? 0),
 
       transactions:
         Array.isArray(

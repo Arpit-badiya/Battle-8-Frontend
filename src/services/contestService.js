@@ -64,6 +64,7 @@ const normalizeContest = (
   prizePool:
     Number(
       contest.prizePool ??
+        contest.totalPool ??
         contest.prize ??
         0
     ),
@@ -143,6 +144,11 @@ const normalizeContest = (
 
   contestPlayers:
     Array.isArray(contest.contestPlayers) ? contest.contestPlayers : [],
+
+  matchName: contest.matchName || contest.title || '',
+  tournamentName: contest.tournamentName || '',
+  matchIdentifier: contest.matchIdentifier || '',
+  matchDateTime: contest.matchDateTime || contest.startTime || contest.startsAt || null,
 });
 
 const normalizeLeaderboardRow = (
@@ -216,6 +222,8 @@ export const createTeam =
     contestId,
     players,
     totalCredits,
+    captain,
+    viceCaptain,
   }) => {
     if (!contestId) {
       throw new Error(
@@ -246,6 +254,9 @@ export const createTeam =
           players:
             uniquePlayers,
 
+          captain,
+          viceCaptain,
+
           totalCredits:
             Number(
               totalCredits ||
@@ -255,6 +266,16 @@ export const createTeam =
       );
 
     return response.data;
+  };
+
+export const getMyTeam =
+  async (contestId) => {
+    if (!contestId) {
+      return null;
+    }
+
+    const response = await api.get(`/team/contest/${contestId}/me`);
+    return response.data?.team || null;
   };
 
 export const getLeaderboard =

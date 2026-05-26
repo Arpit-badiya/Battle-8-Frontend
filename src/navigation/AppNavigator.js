@@ -9,6 +9,10 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import HelpSupportScreen from '../screens/profile/HelpSupportScreen';
 import TermsScreen from '../screens/profile/TermsScreen';
 import TeamBuilderScreen from '../screens/team/TeamBuilderScreen';
+import MyTeamScreen from '../screens/team/MyTeamScreen';
+import EarnCoinsScreen from '../screens/wallet/EarnCoinsScreen';
+import PremiumScreen from '../screens/premium/PremiumScreen';
+import WithdrawalScreen from '../screens/wallet/WithdrawalScreen';
 import BottomTabs from './BottomTabs';
 
 const Stack = createNativeStackNavigator();
@@ -47,6 +51,10 @@ const AppNavigator = () => {
           <>
             <Stack.Screen name="MainTabs" component={BottomTabs} />
             <Stack.Screen name="TeamBuilder" component={TeamBuilderScreen} />
+            <Stack.Screen name="MyTeam" component={MyTeamScreen} />
+            <Stack.Screen name="EarnCoins" component={EarnCoinsScreen} />
+            <Stack.Screen name="Premium" component={PremiumScreen} />
+            <Stack.Screen name="Withdrawal" component={WithdrawalScreen} />
             <Stack.Screen name="Terms" component={TermsScreen} />
             <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
           </>

@@ -15,6 +15,7 @@ import spacing from '../../constants/spacing';
 import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import useAuth from '../../hooks/useAuth';
+import { maybeShowInterstitial } from '../../services/adMobService';
 import { showError } from '../../utils/feedback';
 
 const categories = [
@@ -98,8 +99,17 @@ const HomeScreen = ({ navigation }) => {
       }
 
       setActiveContestId(contest.id);
+      if (!user?.premium?.active) {
+        maybeShowInterstitial().catch(() => undefined);
+      }
       navigation.navigate('TeamBuilder', { contest });
     } catch (error) {
+      if (String(error?.message || '').toLowerCase().includes('insufficient')) {
+        navigation.navigate('EarnCoins', {
+          neededCoins: Math.max(Number(contest.entryFee || 0) - Number(user?.coins || 0), 0),
+        });
+        return;
+      }
       showError('Join failed', error);
     }
   };
@@ -137,8 +147,8 @@ const HomeScreen = ({ navigation }) => {
             <Ionicons name="wallet" size={22} color={colors.coin} />
           </View>
           <View style={styles.coinCopy}>
-            <Text style={styles.coinTitle}>Add Coins</Text>
-            <Text style={styles.coinSub}>Coin system/payment gateway coming soon</Text>
+            <Text style={styles.coinTitle}>Earn Coins</Text>
+            <Text style={styles.coinSub}>Watch ads for entry coins. Winnings stay withdrawable.</Text>
           </View>
         </GlassCard>
 

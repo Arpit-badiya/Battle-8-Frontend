@@ -1,5 +1,5 @@
 import auth from '@react-native-firebase/auth';
-import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import { setAuthToken, setUnauthorizedHandler } from '../services/api';
 import {
@@ -12,6 +12,22 @@ import { clearAuthSession, getAuthSession, saveAuthSession } from '../utils/stor
 export const AuthContext = createContext(null);
 
 const WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID;
+
+const getGoogleSignInErrorMessage = (error) => {
+  if (error?.code === statusCodes.SIGN_IN_CANCELLED) {
+    return 'Google sign-in was cancelled.';
+  }
+
+  if (error?.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+    return 'Google Play Services is not available or needs to be updated.';
+  }
+
+  if (error?.code === statusCodes.DEVELOPER_ERROR || error?.message?.includes('DEVELOPER_ERROR')) {
+    return 'Google Sign-In is not configured for this Android app. Add the app package and signing SHA in Firebase, download the updated google-services.json, then rebuild the app.';
+  }
+
+  return error?.message || 'Google sign-in failed. Please try again.';
+};
 
 const decodeBase64Url = (value = '') => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
@@ -139,7 +155,12 @@ export const AuthProvider = ({ children }) => {
       }
 
       await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
-      const signInResponse = await GoogleSignin.signIn();
+      let signInResponse;
+      try {
+        signInResponse = await GoogleSignin.signIn();
+      } catch (error) {
+        throw new Error(getGoogleSignInErrorMessage(error));
+      }
       const idToken = signInResponse?.type === 'success' ? signInResponse.data?.idToken : null;
 
       if (!idToken) {

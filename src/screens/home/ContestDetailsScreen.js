@@ -81,7 +81,7 @@ const ContestDetailsScreen = ({ navigation }) => {
                 showChevron
                 onPress={() => {
                   setActiveContestId(contest.id);
-                  navigation.navigate('TeamBuilder', { contest });
+                  navigation.navigate(contest.teamCreated ? 'MyTeam' : 'TeamBuilder', { contest, contestId: contest.id });
                 }}
               />
             </AnimatedView>

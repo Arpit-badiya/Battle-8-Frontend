@@ -48,13 +48,18 @@ const WalletScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <GlassCard style={styles.balanceCard} glow>
             <View>
-              <Text style={styles.balanceLabel}>Total Coins</Text>
-              <CoinBadge amount={wallet.balance} compact />
+              <Text style={styles.balanceLabel}>Main Coins</Text>
+              <CoinBadge amount={wallet.mainCoins ?? wallet.balance} compact />
+              <Text style={styles.winningText}>Winning: {wallet.winningCoins || 0}</Text>
             </View>
             <Ionicons name="wallet-outline" size={86} color={colors.primary} style={styles.walletIcon} />
           </GlassCard>
 
-          <Button title="Add Coins" variant="primary" onPress={() => {}} style={styles.addButton} />
+          <View style={styles.actionStack}>
+            <Button title="Earn Coins" variant="primary" onPress={() => navigation.navigate('EarnCoins')} />
+            <Button title="Withdraw Winnings" variant="purple" onPress={() => navigation.navigate('Withdrawal')} />
+            <Button title="Premium" variant="purple" onPress={() => navigation.navigate('Premium')} />
+          </View>
 
           <Text style={styles.historyTitle}>Transaction History</Text>
           <GlassCard style={styles.historyCard}>
@@ -100,6 +105,16 @@ const styles = StyleSheet.create({
   },
   addButton: {
     marginBottom: spacing.md,
+  },
+  actionStack: {
+    gap: spacing.md,
+    marginBottom: spacing.md,
+  },
+  winningText: {
+    color: colors.coin,
+    fontSize: 13,
+    fontWeight: '900',
+    marginTop: spacing.sm,
   },
   historyTitle: {
     color: colors.text,

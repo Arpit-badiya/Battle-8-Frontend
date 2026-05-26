@@ -56,6 +56,8 @@ const normalizePlayer = (
       player.credit ??
       0
   ),
+
+  active: player.active !== false,
 });
 
 export const getPlayers =

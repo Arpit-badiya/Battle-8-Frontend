@@ -12,13 +12,24 @@ import colors from '../../constants/colors';
 import spacing from '../../constants/spacing';
 import useAppData from '../../hooks/useAppData';
 import {
+  cancelContest,
   createContest,
   createPlayer,
+  createTeamPlayers,
+  forceCompleteContest,
+  getAdminAdRewards,
   getAdminDashboard,
   getAdminLeaderboard,
+  getAdminWithdrawals,
   importContestPlayers,
   importContestResults,
+  markContestLive,
   processResults,
+  refundContest,
+  rehostContest,
+  restartResultProcessing,
+  setUserPremium,
+  updateWithdrawalStatus,
   updateContestPlayers,
 } from '../../services/adminService';
 import { getContestPlayers } from '../../services/playerService';
@@ -31,6 +42,9 @@ const initialContest = {
   platformCommissionPercent: '10',
   startTime: '',
   estimatedEndTime: '',
+  matchName: '',
+  tournamentName: '',
+  matchIdentifier: '',
 };
 
 const initialPlayer = {
@@ -39,6 +53,8 @@ const initialPlayer = {
   credits: '',
   role: 'Assaulter',
 };
+
+const emptyBulkPlayer = () => ({ name: '', credits: '', role: 'Assaulter' });
 
 const placementPoints = {
   1: 20,
@@ -100,8 +116,12 @@ const DateTimeField = ({ label, value, onPress }) => (
 const AdminScreen = ({ navigation }) => {
   const { contests, players, refreshContests, refreshPlayers, refreshLeaderboard } = useAppData();
   const [dashboard, setDashboard] = useState(null);
+  const [withdrawals, setWithdrawals] = useState([]);
+  const [adRewards, setAdRewards] = useState([]);
   const [contestForm, setContestForm] = useState(initialContest);
   const [playerForm, setPlayerForm] = useState(initialPlayer);
+  const [bulkTeamName, setBulkTeamName] = useState('');
+  const [bulkPlayers, setBulkPlayers] = useState(Array.from({ length: 5 }, emptyBulkPlayer));
   const [selectedContestId, setSelectedContestId] = useState('');
   const [contestPlayerIds, setContestPlayerIds] = useState([]);
   const [contestPlayers, setContestPlayers] = useState([]);
@@ -121,15 +141,18 @@ const AdminScreen = ({ navigation }) => {
     const entryFee = Number(contestForm.entryFee || 0);
     const spots = Number(contestForm.players || 0);
     const commission = Number(contestForm.platformCommissionPercent || 0);
-    const totalCollection = entryFee * spots;
+    const joined = Number(selectedContest?.joined || 0);
+    const totalCollection = entryFee * joined;
+    const maxCollection = entryFee * spots;
     const commissionAmount = (totalCollection * commission) / 100;
 
     return {
       totalCollection,
+      maxCollection,
       commissionAmount,
-      prizePool: Math.max(totalCollection - commissionAmount, 0),
+      prizePool: Math.max(totalCollection, 0),
     };
-  }, [contestForm.entryFee, contestForm.platformCommissionPercent, contestForm.players]);
+  }, [contestForm.entryFee, contestForm.platformCommissionPercent, contestForm.players, selectedContest?.joined]);
 
   const filteredPlayers = useMemo(() => {
     const query = playerSearch.trim().toLowerCase();
@@ -146,14 +169,18 @@ const AdminScreen = ({ navigation }) => {
 
       const load = async () => {
         try {
-          const [stats, latestContests] = await Promise.all([
+          const [stats, latestContests, , latestWithdrawals, latestAdRewards] = await Promise.all([
             getAdminDashboard(),
             refreshContests({ silent: contests.length > 0 }),
             refreshPlayers({ silent: true }),
+            getAdminWithdrawals(),
+            getAdminAdRewards(),
           ]);
 
           if (active) {
             setDashboard(stats);
+            setWithdrawals(latestWithdrawals);
+            setAdRewards(latestAdRewards);
             setSelectedContestId((current) => current || latestContests[0]?.id || '');
           }
         } catch (error) {
@@ -234,6 +261,33 @@ const AdminScreen = ({ navigation }) => {
       showSuccess('Contest created');
     } catch (error) {
       showError('Contest creation failed', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateBulkPlayer = (index, patch) => {
+    setBulkPlayers((current) =>
+      current.map((player, itemIndex) => (itemIndex === index ? { ...player, ...patch } : player))
+    );
+  };
+
+  const submitBulkTeam = async () => {
+    setSaving(true);
+    try {
+      await createTeamPlayers({
+        team: bulkTeamName,
+        players: bulkPlayers.map((player) => ({
+          ...player,
+          credits: Number(player.credits),
+        })),
+      });
+      setBulkTeamName('');
+      setBulkPlayers(Array.from({ length: 5 }, emptyBulkPlayer));
+      await refreshPlayers({ silent: true });
+      showSuccess('Team players saved');
+    } catch (error) {
+      showError('Team player creation failed', error);
     } finally {
       setSaving(false);
     }
@@ -346,12 +400,15 @@ const AdminScreen = ({ navigation }) => {
     const playerResults = contestPlayers.map((player) => {
       const id = getId(player);
       const row = resultRows[id] || {};
+      if (row.kills === '' && row.placement === '') {
+        return null;
+      }
       return {
         playerId: id,
         kills: Number(row.kills),
         placement: Number(row.placement),
       };
-    });
+    }).filter(Boolean);
 
     const invalid = playerResults.some(
       (row) =>
@@ -363,13 +420,25 @@ const AdminScreen = ({ navigation }) => {
     );
 
     if (invalid) {
-      Alert.alert('Invalid results', 'Enter kills >= 0 and placement between 1 and 16 for every player.');
+      Alert.alert('Invalid results', 'Enter kills >= 0 and placement between 1 and 16 for each active player.');
+      return;
+    }
+
+    if (playerResults.length === 0) {
+      Alert.alert('Results required', 'Enter results for at least one active player.');
       return;
     }
 
     setSaving(true);
     try {
-      const response = await processResults({ contestId: selectedContestId, playerResults });
+      const response = await processResults({
+        contestId: selectedContestId,
+        playerResults,
+        matchName: selectedContest?.matchName,
+        tournamentName: selectedContest?.tournamentName,
+        matchIdentifier: selectedContest?.matchIdentifier,
+        matchDateTime: selectedContest?.matchDateTime,
+      });
       const rows = response.leaderboard || await getAdminLeaderboard(selectedContestId);
       setLeaderboard(rows);
       await Promise.all([
@@ -379,6 +448,69 @@ const AdminScreen = ({ navigation }) => {
       showSuccess('Match completed and payouts processed');
     } catch (error) {
       showError('Match completion failed', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runAdminControl = async (action, label) => {
+    if (!selectedContestId) {
+      Alert.alert('Contest required', 'Select a contest first.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const nextStart = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+      if (action === 'live') await markContestLive(selectedContestId);
+      if (action === 'cancel') await cancelContest({ contestId: selectedContestId, reason: 'Manual admin cancellation' });
+      if (action === 'rehost') {
+        await rehostContest({
+          contestId: selectedContestId,
+          startTime: nextStart,
+          reason: 'Manual admin rehost',
+          matchName: selectedContest?.matchName,
+          tournamentName: selectedContest?.tournamentName,
+          matchIdentifier: selectedContest?.matchIdentifier,
+          matchDateTime: selectedContest?.matchDateTime,
+        });
+      }
+      if (action === 'complete') await forceCompleteContest(selectedContestId);
+      if (action === 'refund') await refundContest(selectedContestId);
+      if (action === 'restart') await restartResultProcessing(selectedContestId);
+
+      await Promise.all([
+        refreshContests({ silent: true }),
+        refreshLeaderboard(selectedContestId, { silent: true }),
+      ]);
+      showSuccess(label);
+    } catch (error) {
+      showError(label, error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const runWithdrawalControl = async (withdrawalId, status) => {
+    setSaving(true);
+    try {
+      await updateWithdrawalStatus({ withdrawalId, status });
+      setWithdrawals(await getAdminWithdrawals());
+      showSuccess(`Withdrawal ${status}`);
+    } catch (error) {
+      showError('Withdrawal update failed', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const activatePremiumForWithdrawalUser = async (userId, active) => {
+    setSaving(true);
+    try {
+      await setUserPremium({ userId, active });
+      showSuccess(active ? 'Premium activated' : 'Premium expired');
+    } catch (error) {
+      showError('Premium update failed', error);
     } finally {
       setSaving(false);
     }
@@ -462,12 +594,55 @@ const AdminScreen = ({ navigation }) => {
             ['Contests', dashboard?.totalContests ?? 0],
             ['Teams', dashboard?.totalTeams ?? 0],
             ['Earnings', dashboard?.platformEarnings ?? 0],
+            ['Pending WD', dashboard?.pendingWithdrawals ?? 0],
+            ['Ad Coins', dashboard?.adRewardCoins ?? 0],
           ].map(([label, value]) => (
             <View key={label} style={styles.stat}>
               <Text style={styles.statValue}>{value}</Text>
               <Text style={styles.statLabel}>{label}</Text>
             </View>
           ))}
+        </GlassCard>
+
+        <GlassCard style={styles.panel}>
+          <Text style={styles.panelTitle}>Withdrawals & Economy</Text>
+          {withdrawals.slice(0, 5).map((item) => (
+            <View key={item.id} style={styles.economyRow}>
+              <View style={styles.economyMain}>
+                <Text style={styles.economyTitle}>{item.user?.name || item.accountName || 'Player'} · {item.amountCoins} coins</Text>
+                <Text style={styles.economyMeta}>{item.status.toUpperCase()} · {item.upiId}</Text>
+              </View>
+              <View style={styles.economyActions}>
+                {item.status === 'requested' && (
+                  <Pressable style={styles.miniButton} onPress={() => runWithdrawalControl(item.id, 'approved')}>
+                    <Text style={styles.miniText}>Approve</Text>
+                  </Pressable>
+                )}
+                {item.status === 'approved' && (
+                  <Pressable style={styles.miniButton} onPress={() => runWithdrawalControl(item.id, 'paid')}>
+                    <Text style={styles.miniText}>Paid</Text>
+                  </Pressable>
+                )}
+                {['requested', 'approved'].includes(item.status) && (
+                  <Pressable style={[styles.miniButton, styles.dangerButton]} onPress={() => runWithdrawalControl(item.id, 'rejected')}>
+                    <Text style={styles.miniText}>Reject</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          ))}
+          {withdrawals.length === 0 && <Text style={styles.statusLine}>No withdrawal requests yet.</Text>}
+          <Text style={styles.statusLine}>{adRewards.length} recent ad reward logs loaded</Text>
+          {withdrawals[0]?.user?._id && (
+            <View style={styles.controlGrid}>
+              <Pressable style={styles.controlButton} onPress={() => activatePremiumForWithdrawalUser(withdrawals[0].user._id, true)}>
+                <Text style={styles.controlText}>Premium On</Text>
+              </Pressable>
+              <Pressable style={styles.controlButton} onPress={() => activatePremiumForWithdrawalUser(withdrawals[0].user._id, false)}>
+                <Text style={styles.controlText}>Premium Off</Text>
+              </Pressable>
+            </View>
+          )}
         </GlassCard>
 
         <GlassCard style={styles.panel}>
@@ -480,16 +655,46 @@ const AdminScreen = ({ navigation }) => {
           <Field label="Commission %" keyboardType="decimal-pad" value={contestForm.platformCommissionPercent} onChangeText={(platformCommissionPercent) => setContestForm((current) => ({ ...current, platformCommissionPercent }))} />
           <DateTimeField label="Start Time" value={contestForm.startTime} onPress={() => openDatePicker('startTime')} />
           <DateTimeField label="Estimated End" value={contestForm.estimatedEndTime} onPress={() => openDatePicker('estimatedEndTime')} />
+          <Field label="Match Name" value={contestForm.matchName} onChangeText={(matchName) => setContestForm((current) => ({ ...current, matchName }))} />
+          <Field label="Tournament" value={contestForm.tournamentName} onChangeText={(tournamentName) => setContestForm((current) => ({ ...current, tournamentName }))} />
+          <Field label="Match ID" value={contestForm.matchIdentifier} onChangeText={(matchIdentifier) => setContestForm((current) => ({ ...current, matchIdentifier }))} />
           <View style={styles.accountingBox}>
-            <Text style={styles.accountingText}>Collection: {accountingPreview.totalCollection.toFixed(2)}</Text>
+            <Text style={styles.accountingText}>Current Collection: {accountingPreview.totalCollection.toFixed(2)}</Text>
+            <Text style={styles.accountingText}>Max Collection: {accountingPreview.maxCollection.toFixed(2)}</Text>
             <Text style={styles.accountingText}>Commission: {accountingPreview.commissionAmount.toFixed(2)}</Text>
-            <Text style={styles.accountingPrize}>Prize Pool: {accountingPreview.prizePool.toFixed(2)}</Text>
+            <Text style={styles.accountingPrize}>Live Prize Pool: {accountingPreview.prizePool.toFixed(2)}</Text>
           </View>
           <Button title="Create Contest" loading={saving} disabled={saving} onPress={submitContest} />
         </GlassCard>
 
         <GlassCard style={styles.panel}>
-          <Text style={styles.panelTitle}>Player Management</Text>
+          <Text style={styles.panelTitle}>Team Player Creation</Text>
+          <Field label="Team Name" value={bulkTeamName} onChangeText={setBulkTeamName} />
+          {bulkPlayers.map((player, index) => (
+            <View key={String(index)} style={styles.bulkRow}>
+              <Text style={styles.bulkIndex}>{index + 1}</Text>
+              <TextInput
+                value={player.name}
+                onChangeText={(name) => updateBulkPlayer(index, { name })}
+                placeholder="Player name"
+                placeholderTextColor={colors.textDim}
+                style={[styles.input, styles.bulkName]}
+              />
+              <TextInput
+                value={player.credits}
+                onChangeText={(credits) => updateBulkPlayer(index, { credits })}
+                keyboardType="decimal-pad"
+                placeholder="Cr"
+                placeholderTextColor={colors.textDim}
+                style={[styles.input, styles.bulkCredits]}
+              />
+            </View>
+          ))}
+          <Button title="Save 5 Players" loading={saving} disabled={saving} onPress={submitBulkTeam} />
+        </GlassCard>
+
+        <GlassCard style={styles.panel}>
+          <Text style={styles.panelTitle}>Single Player</Text>
           <Field label="Name" value={playerForm.name} onChangeText={(name) => setPlayerForm((current) => ({ ...current, name }))} />
           <Field label="Team" value={playerForm.team} onChangeText={(team) => setPlayerForm((current) => ({ ...current, team }))} />
           <View style={styles.row}>
@@ -519,6 +724,26 @@ const AdminScreen = ({ navigation }) => {
           <Text style={styles.statusLine}>
             {(selectedContest?.status || 'upcoming').toUpperCase()} | {contestPlayerIds.length} players selected
           </Text>
+          <View style={styles.controlGrid}>
+            <Pressable style={styles.controlButton} onPress={() => runAdminControl('live', 'Match marked live')}>
+              <Text style={styles.controlText}>Live</Text>
+            </Pressable>
+            <Pressable style={styles.controlButton} onPress={() => runAdminControl('cancel', 'Match cancelled')}>
+              <Text style={styles.controlText}>Cancel</Text>
+            </Pressable>
+            <Pressable style={styles.controlButton} onPress={() => runAdminControl('rehost', 'Match rehosted')}>
+              <Text style={styles.controlText}>Rehost</Text>
+            </Pressable>
+            <Pressable style={styles.controlButton} onPress={() => runAdminControl('complete', 'Force completed')}>
+              <Text style={styles.controlText}>Complete</Text>
+            </Pressable>
+            <Pressable style={styles.controlButton} onPress={() => runAdminControl('refund', 'Refund processed')}>
+              <Text style={styles.controlText}>Refund</Text>
+            </Pressable>
+            <Pressable style={styles.controlButton} onPress={() => runAdminControl('restart', 'Results restarted')}>
+              <Text style={styles.controlText}>Restart</Text>
+            </Pressable>
+          </View>
           <View style={styles.importRow}>
             <Button title="Import CSV/XLSX" variant="outline" loading={saving} disabled={saving || selectedContest?.status !== 'upcoming'} onPress={() => pickImportFile('players')} />
           </View>
@@ -663,6 +888,95 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     gap: spacing.md,
+  },
+  bulkRow: {
+    minHeight: 44,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  bulkIndex: {
+    width: 22,
+    color: colors.primary,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  bulkName: {
+    flex: 1,
+  },
+  bulkCredits: {
+    width: 72,
+    textAlign: 'center',
+  },
+  controlGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  controlButton: {
+    minWidth: '30%',
+    minHeight: 38,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+  },
+  controlText: {
+    color: colors.text,
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  economyRow: {
+    minHeight: 64,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSoft,
+    paddingVertical: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  economyMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  economyTitle: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  economyMeta: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  economyActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
+    gap: spacing.xs,
+    width: 118,
+  },
+  miniButton: {
+    minHeight: 28,
+    borderRadius: 7,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryDark,
+  },
+  dangerButton: {
+    backgroundColor: colors.danger,
+  },
+  miniText: {
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
   field: {
     flex: 1,

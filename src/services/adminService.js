@@ -5,6 +5,33 @@ export const getAdminDashboard = async () => {
   return response.data;
 };
 
+export const getAdminAdRewards = async () => {
+  const response = await api.get('/admin/ad-rewards');
+  return response.data.rewards || [];
+};
+
+export const getAdminWithdrawals = async () => {
+  const response = await api.get('/admin/withdrawals');
+  return response.data.withdrawals || [];
+};
+
+export const updateWithdrawalStatus = async ({ withdrawalId, status, adminNote, paymentReference }) => {
+  const response = await api.post(`/admin/withdrawals/${withdrawalId}/status`, {
+    status,
+    adminNote,
+    paymentReference,
+  });
+  return response.data;
+};
+
+export const setUserPremium = async ({ userId, active, expiresAt }) => {
+  const response = await api.post(`/admin/users/${userId}/premium`, {
+    active,
+    expiresAt,
+  });
+  return response.data;
+};
+
 export const createContest = async (payload) => {
   const response = await api.post('/admin/contests', payload);
   return response.data;
@@ -15,10 +42,19 @@ export const createPlayer = async (payload) => {
   return response.data;
 };
 
-export const processResults = async ({ contestId, playerResults }) => {
+export const createTeamPlayers = async (payload) => {
+  const response = await api.post('/players/team', payload);
+  return response.data;
+};
+
+export const processResults = async ({ contestId, playerResults, matchName, tournamentName, matchIdentifier, matchDateTime }) => {
   const response = await api.post('/results/process', {
     contestId,
     playerResults,
+    matchName,
+    tournamentName,
+    matchIdentifier,
+    matchDateTime,
   });
 
   return response.data;
@@ -39,6 +75,53 @@ export const updateContestPlayers = async ({ contestId, players }) => {
   const response = await api.put(`/admin/contests/${contestId}/players`, {
     players,
   });
+  return response.data;
+};
+
+export const markContestLive = async (contestId) => {
+  const response = await api.post(`/admin/contests/${contestId}/live`);
+  return response.data;
+};
+
+export const cancelContest = async ({ contestId, reason }) => {
+  const response = await api.post(`/admin/contests/${contestId}/cancel`, { reason });
+  return response.data;
+};
+
+export const rehostContest = async ({
+  contestId,
+  startTime,
+  estimatedEndTime,
+  reason,
+  matchName,
+  tournamentName,
+  matchIdentifier,
+  matchDateTime,
+}) => {
+  const response = await api.post(`/admin/contests/${contestId}/rehost`, {
+    startTime,
+    estimatedEndTime,
+    reason,
+    matchName,
+    tournamentName,
+    matchIdentifier,
+    matchDateTime,
+  });
+  return response.data;
+};
+
+export const forceCompleteContest = async (contestId) => {
+  const response = await api.post(`/admin/contests/${contestId}/complete`);
+  return response.data;
+};
+
+export const refundContest = async (contestId) => {
+  const response = await api.post(`/admin/contests/${contestId}/refund`);
+  return response.data;
+};
+
+export const restartResultProcessing = async (contestId) => {
+  const response = await api.post(`/admin/contests/${contestId}/restart-results`);
   return response.data;
 };
 

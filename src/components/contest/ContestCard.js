@@ -95,6 +95,14 @@ const ContestCard = ({
       : remainingSlots < 20
       ? 'Filling Fast'
       : 'Hot';
+  const payoutPreview = [
+    ['1', 0.5],
+    ['2', 0.3],
+    ['3', 0.2],
+  ].map(([rank, share]) => ({
+    rank,
+    amount: Math.round(Number(contest.prizePool || 0) * share * 100) / 100,
+  }));
 
   return (
     <GlassCard style={styles.card}>
@@ -180,6 +188,14 @@ const ContestCard = ({
             },
           ]}
         />
+      </View>
+
+      <View style={styles.payoutRow}>
+        {payoutPreview.map((item) => (
+          <Text key={item.rank} style={styles.payoutText}>
+            #{item.rank} {item.amount}
+          </Text>
+        ))}
       </View>
 
       <View style={styles.bottomRow}>
@@ -325,6 +341,18 @@ const styles = StyleSheet.create({
     justifyContent:
       'space-between',
     marginTop: spacing.lg,
+  },
+  payoutRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.sm,
+    gap: spacing.sm,
+  },
+  payoutText: {
+    flex: 1,
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '800',
   },
 
   time: {
