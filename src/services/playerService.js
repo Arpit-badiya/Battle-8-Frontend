@@ -47,9 +47,9 @@ const normalizePlayer = (
     'Unknown Team',
 
   role:
-    player.role ||
+    player.role === 'Support' ? 'Supporter' : player.role ||
     player.position ||
-    'BAT',
+    'Assaulter',
 
   credits: Number(
     player.credits ??
@@ -61,10 +61,11 @@ const normalizePlayer = (
 });
 
 export const getPlayers =
-  async () => {
+  async ({ game } = {}) => {
     const response =
       await api.get(
-        '/players'
+        '/players',
+        game ? { params: { game } } : undefined
       );
 
     return unwrapList(

@@ -189,10 +189,11 @@ const normalizeLeaderboardRow = (
 });
 
 export const getContests =
-  async () => {
+  async ({ game } = {}) => {
     const response =
       await api.get(
-        '/contests'
+        '/contests',
+        game ? { params: { game } } : undefined
       );
 
     return unwrapList(

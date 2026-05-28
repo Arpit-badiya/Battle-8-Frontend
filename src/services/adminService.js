@@ -47,6 +47,18 @@ export const createTeamPlayers = async (payload) => {
   return response.data;
 };
 
+export const deletePlayer = async (playerId) => {
+  const response = await api.delete(`/players/${playerId}`);
+  return response.data;
+};
+
+export const deleteTeam = async ({ game, team }) => {
+  const response = await api.delete('/players/team', {
+    data: { game, team },
+  });
+  return response.data;
+};
+
 export const processResults = async ({ contestId, playerResults, matchName, tournamentName, matchIdentifier, matchDateTime }) => {
   const response = await api.post('/results/process', {
     contestId,

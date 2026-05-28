@@ -112,54 +112,56 @@ export const AppDataProvider = ({ children }) => {
     }));
   }, []);
 
-  const refreshContests = useCallback(async ({ silent = false } = {}) => {
-    if (requestsRef.current.contests) {
-      return requestsRef.current.contests;
+  const refreshContests = useCallback(async ({ silent = false, game = '' } = {}) => {
+    const requestKey = game ? `contests:${game}` : 'contests';
+    if (requestsRef.current[requestKey]) {
+      return requestsRef.current[requestKey];
     }
 
     if (!silent) {
       safeSetLoading('contests', true);
     }
 
-    requestsRef.current.contests = getContestsRequest()
+    requestsRef.current[requestKey] = getContestsRequest({ game })
       .then((data) => {
-        if (mountedRef.current) {
+        if (mountedRef.current && !game) {
           setContests(data);
         }
 
         return data;
       })
       .finally(() => {
-        delete requestsRef.current.contests;
+        delete requestsRef.current[requestKey];
         safeSetLoading('contests', false);
       });
 
-    return requestsRef.current.contests;
+    return requestsRef.current[requestKey];
   }, [safeSetLoading]);
 
-  const refreshPlayers = useCallback(async ({ silent = false } = {}) => {
-    if (requestsRef.current.players) {
-      return requestsRef.current.players;
+  const refreshPlayers = useCallback(async ({ silent = false, game = '' } = {}) => {
+    const requestKey = game ? `players:${game}` : 'players';
+    if (requestsRef.current[requestKey]) {
+      return requestsRef.current[requestKey];
     }
 
     if (!silent) {
       safeSetLoading('players', true);
     }
 
-    requestsRef.current.players = getPlayersRequest()
+    requestsRef.current[requestKey] = getPlayersRequest({ game })
       .then((data) => {
-        if (mountedRef.current) {
+        if (mountedRef.current && !game) {
           setPlayers(data);
         }
 
         return data;
       })
       .finally(() => {
-        delete requestsRef.current.players;
+        delete requestsRef.current[requestKey];
         safeSetLoading('players', false);
       });
 
-    return requestsRef.current.players;
+    return requestsRef.current[requestKey];
   }, [safeSetLoading]);
 
   const refreshWallet = useCallback(async ({ silent = false } = {}) => {
@@ -439,13 +441,60 @@ export const AppDataProvider = ({ children }) => {
     requestsRef.current.createTeam = true;
 
     try {
-      const response = await createTeamRequest({
-        contestId,
-        players: uniquePlayerIds,
-        captain,
-        viceCaptain,
-        totalCredits,
-      });
+      let teamResponse = null;
+      const contest = contests.find((item) => (item.id || item._id) === contestId);
+      const entryFee = Number(contest?.entryFee || 0);
+
+      if (!contest?.userJoined && entryFee > 0) {
+        const latestWallet = await refreshWallet({ silent: true }).catch(() => wallet);
+        const availableCoins = Number(
+          latestWallet?.balance ??
+            latestWallet?.coins ??
+            wallet?.balance ??
+            wallet?.coins ??
+            user?.coins ??
+            0
+        );
+
+        if (availableCoins < entryFee) {
+          const error = new Error('Insufficient wallet balance');
+          error.neededCoins = Math.max(entryFee - availableCoins, 0);
+          throw error;
+        }
+      }
+
+      try {
+        teamResponse = await createTeamRequest({
+          contestId,
+          players: uniquePlayerIds,
+          captain,
+          viceCaptain,
+          totalCredits,
+        });
+      } catch (error) {
+        const isExistingTeam =
+          error?.status === 409 ||
+          String(error?.message || '').toLowerCase().includes('team already created');
+
+        if (!isExistingTeam) {
+          throw error;
+        }
+      }
+
+      let joinResponse = null;
+      if (!contest?.userJoined) {
+        try {
+          joinResponse = await joinContestRequest(contestId);
+        } catch (error) {
+          const alreadyJoined =
+            error?.status === 409 ||
+            String(error?.message || '').toLowerCase().includes('already joined');
+
+          if (!alreadyJoined) {
+            throw error;
+          }
+        }
+      }
 
       setContests((current) =>
         current.map((contest) =>
@@ -459,17 +508,19 @@ export const AppDataProvider = ({ children }) => {
         )
       );
 
-      await Promise.all([
-        refreshContests({ silent: true }),
-        refreshWallet({ silent: true }),
-        refreshLeaderboard(contestId, {
-          silent: true,
-        }),
-      ]);
+      if (joinResponse) {
+        await syncAfterJoin(contestId, joinResponse);
+      } else {
+        await refreshContests({ silent: true });
+      }
+      await refreshLeaderboard(contestId, { silent: true });
 
       showSuccess('Team created successfully');
 
-      return response;
+      return {
+        team: teamResponse?.team || teamResponse,
+        join: joinResponse,
+      };
     } finally {
       delete requestsRef.current.createTeam;
 
@@ -479,9 +530,13 @@ export const AppDataProvider = ({ children }) => {
     }
   }, [
     creatingTeam,
+    contests,
     refreshContests,
     refreshLeaderboard,
     refreshWallet,
+    syncAfterJoin,
+    user?.coins,
+    wallet,
   ]);
 
   const activeContest = useMemo(

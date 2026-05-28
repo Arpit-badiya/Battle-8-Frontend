@@ -62,7 +62,7 @@ const ContestCard = ({
       ? 'live'
       : contest.status || 'upcoming';
   const isClosed = ['live', 'completed', 'cancelled'].includes(effectiveStatus);
-  const isDisabled = disabled || contest.teamCreated || isFull || isClosed;
+  const isDisabled = disabled || (!contest.userJoined && isFull) || isClosed;
   const buttonTitle = contest.teamCreated
     ? 'Team Created'
     : effectiveStatus === 'live'

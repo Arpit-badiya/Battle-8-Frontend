@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import Button from '../../components/common/Button';
 import BrandLogo from '../../components/common/BrandLogo';
 import GlassCard from '../../components/common/GlassCard';
@@ -16,6 +16,8 @@ import {
   createContest,
   createPlayer,
   createTeamPlayers,
+  deletePlayer,
+  deleteTeam as deleteTeamRequest,
   forceCompleteContest,
   getAdminAdRewards,
   getAdminDashboard,
@@ -30,24 +32,23 @@ import {
   restartResultProcessing,
   setUserPremium,
   updateWithdrawalStatus,
-  updateContestPlayers,
 } from '../../services/adminService';
 import { getContestPlayers } from '../../services/playerService';
 import { showError, showSuccess } from '../../utils/feedback';
 
 const initialContest = {
+  game: 'BGMI',
   title: '',
   players: '',
   entryFee: '',
   platformCommissionPercent: '10',
   startTime: '',
   estimatedEndTime: '',
-  matchName: '',
   tournamentName: '',
-  matchIdentifier: '',
 };
 
 const initialPlayer = {
+  game: 'BGMI',
   name: '',
   team: '',
   credits: '',
@@ -55,6 +56,8 @@ const initialPlayer = {
 };
 
 const emptyBulkPlayer = () => ({ name: '', credits: '', role: 'Assaulter' });
+const roleOptions = ['IGL', 'Assaulter', 'Supporter'];
+const gameOptions = ['BGMI', 'Free Fire', 'Valorant', 'COD Mobile'];
 
 const placementPoints = {
   1: 20,
@@ -67,6 +70,7 @@ const placementPoints = {
 };
 
 const getId = (item = {}) => String(item.id || item._id || item);
+const getGame = (item = {}) => item.game || 'BGMI';
 const calculateFantasyPoints = (kills, placement) =>
   Math.max(0, Number(kills || 0)) * 4 + (placementPoints[Number(placement)] || 0);
 
@@ -113,6 +117,86 @@ const DateTimeField = ({ label, value, onPress }) => (
   </View>
 );
 
+const RolePicker = ({ value, onChange }) => (
+  <View style={styles.rolePicker}>
+    {roleOptions.map((item) => {
+      const selected = value === item;
+      return (
+        <Pressable key={item} onPress={() => onChange(item)} style={[styles.roleOption, selected && styles.roleOptionActive]}>
+          <Text style={[styles.roleOptionText, selected && styles.roleOptionTextActive]}>{item}</Text>
+        </Pressable>
+      );
+    })}
+  </View>
+);
+
+const GamePicker = ({ value, onChange }) => (
+  <View style={styles.gamePicker}>
+    {gameOptions.map((item) => {
+      const selected = value === item;
+      return (
+        <Pressable key={item} onPress={() => onChange(item)} style={[styles.gameOption, selected && styles.gameOptionActive]}>
+          <Text numberOfLines={1} style={[styles.gameOptionText, selected && styles.gameOptionTextActive]}>{item}</Text>
+        </Pressable>
+      );
+    })}
+  </View>
+);
+
+const SearchableSelect = ({
+  label,
+  value,
+  placeholder = 'Select',
+  search,
+  onSearch,
+  options,
+  open,
+  onOpenChange,
+  onSelect,
+  multi = false,
+  selectedValues = [],
+  emptyText = 'No items found.',
+}) => (
+  <View style={styles.field}>
+    <Text style={styles.label}>{label}</Text>
+    <Pressable onPress={() => onOpenChange(!open)} style={styles.selectButton}>
+      <Text numberOfLines={1} style={[styles.selectText, !value && styles.selectPlaceholder]}>
+        {value || placeholder}
+      </Text>
+      <Text style={styles.selectChevron}>{open ? 'CLOSE' : 'OPEN'}</Text>
+    </Pressable>
+    {open && (
+      <View style={styles.selectPanel}>
+        <TextInput
+          value={search}
+          onChangeText={onSearch}
+          placeholder="Search"
+          placeholderTextColor={colors.textDim}
+          style={styles.selectSearch}
+        />
+        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={styles.selectList}>
+          {options.map((option) => {
+            const selected = multi ? selectedValues.includes(option) : value === option;
+            return (
+              <Pressable
+                key={option}
+                onPress={() => onSelect(option)}
+                style={[styles.teamOption, selected && styles.teamOptionActive]}
+              >
+                <Text numberOfLines={1} style={[styles.teamOptionText, selected && styles.teamOptionTextActive]}>
+                  {option}
+                </Text>
+                {selected && <Text style={styles.teamSelectedMark}>{multi ? 'SELECTED' : 'ACTIVE'}</Text>}
+              </Pressable>
+            );
+          })}
+          {options.length === 0 && <Text style={styles.emptyText}>{emptyText}</Text>}
+        </ScrollView>
+      </View>
+    )}
+  </View>
+);
+
 const AdminScreen = ({ navigation }) => {
   const { contests, players, refreshContests, refreshPlayers, refreshLeaderboard } = useAppData();
   const [dashboard, setDashboard] = useState(null);
@@ -120,13 +204,27 @@ const AdminScreen = ({ navigation }) => {
   const [adRewards, setAdRewards] = useState([]);
   const [contestForm, setContestForm] = useState(initialContest);
   const [playerForm, setPlayerForm] = useState(initialPlayer);
+  const [bulkGame, setBulkGame] = useState('BGMI');
   const [bulkTeamName, setBulkTeamName] = useState('');
   const [bulkPlayers, setBulkPlayers] = useState(Array.from({ length: 5 }, emptyBulkPlayer));
   const [selectedContestId, setSelectedContestId] = useState('');
-  const [contestPlayerIds, setContestPlayerIds] = useState([]);
+  const [selectedContestTeamNames, setSelectedContestTeamNames] = useState([]);
   const [contestPlayers, setContestPlayers] = useState([]);
   const [resultRows, setResultRows] = useState({});
-  const [playerSearch, setPlayerSearch] = useState('');
+  const [teamSearch, setTeamSearch] = useState('');
+  const [contestTeamOpen, setContestTeamOpen] = useState(false);
+  const [singleTeamOpen, setSingleTeamOpen] = useState(false);
+  const [deleteTeamOpen, setDeleteTeamOpen] = useState(false);
+  const [deletePlayerOpen, setDeletePlayerOpen] = useState(false);
+  const [teamDeleteGame, setTeamDeleteGame] = useState('BGMI');
+  const [teamDeleteOpen, setTeamDeleteOpen] = useState(false);
+  const [teamDeleteSearch, setTeamDeleteSearch] = useState('');
+  const [teamDeleteName, setTeamDeleteName] = useState('');
+  const [deleteGame, setDeleteGame] = useState('BGMI');
+  const [deleteTeamSearch, setDeleteTeamSearch] = useState('');
+  const [deleteTeamName, setDeleteTeamName] = useState('');
+  const [deletePlayerId, setDeletePlayerId] = useState('');
+  const [deletePlayerSearch, setDeletePlayerSearch] = useState('');
   const [leaderboard, setLeaderboard] = useState([]);
   const [saving, setSaving] = useState(false);
   const [picker, setPicker] = useState(null);
@@ -135,6 +233,63 @@ const AdminScreen = ({ navigation }) => {
   const selectedContest = useMemo(
     () => contests.find((contest) => getId(contest) === selectedContestId),
     [contests, selectedContestId]
+  );
+
+  const getTeamNamesForGame = useCallback(
+    (game) => [...new Set(players.filter((player) => getGame(player) === game).map((player) => player.team).filter(Boolean))].sort(),
+    [players]
+  );
+
+  const teamNames = useMemo(() => getTeamNamesForGame(contestForm.game), [contestForm.game, getTeamNamesForGame]);
+  const singleTeamNames = useMemo(() => getTeamNamesForGame(playerForm.game), [getTeamNamesForGame, playerForm.game]);
+  const bulkTeamExists = useMemo(
+    () => getTeamNamesForGame(bulkGame).some((teamName) => teamName.toLowerCase() === bulkTeamName.trim().toLowerCase()),
+    [bulkGame, bulkTeamName, getTeamNamesForGame]
+  );
+  const deleteTeamNames = useMemo(() => getTeamNamesForGame(deleteGame), [deleteGame, getTeamNamesForGame]);
+  const teamDeleteNames = useMemo(() => getTeamNamesForGame(teamDeleteGame), [getTeamNamesForGame, teamDeleteGame]);
+
+  const filteredTeamNames = useMemo(() => {
+    const query = teamSearch.trim().toLowerCase();
+    if (!query) return teamNames;
+    return teamNames.filter((teamName) => teamName.toLowerCase().includes(query));
+  }, [teamNames, teamSearch]);
+
+  const filteredSingleTeamNames = useMemo(() => {
+    const query = playerForm.team.trim().toLowerCase();
+    if (!query) return singleTeamNames;
+    return singleTeamNames.filter((teamName) => teamName.toLowerCase().includes(query));
+  }, [playerForm.team, singleTeamNames]);
+
+  const filteredDeleteTeamNames = useMemo(() => {
+    const query = deleteTeamSearch.trim().toLowerCase();
+    if (!query) return deleteTeamNames;
+    return deleteTeamNames.filter((teamName) => teamName.toLowerCase().includes(query));
+  }, [deleteTeamNames, deleteTeamSearch]);
+
+  const filteredTeamDeleteNames = useMemo(() => {
+    const query = teamDeleteSearch.trim().toLowerCase();
+    if (!query) return teamDeleteNames;
+    return teamDeleteNames.filter((teamName) => teamName.toLowerCase().includes(query));
+  }, [teamDeleteNames, teamDeleteSearch]);
+
+  const teamDeletePlayerCount = useMemo(
+    () => players.filter((player) => getGame(player) === teamDeleteGame && player.team === teamDeleteName).length,
+    [players, teamDeleteGame, teamDeleteName]
+  );
+
+  const deleteTeamPlayers = useMemo(
+    () => players.filter((player) => getGame(player) === deleteGame && player.team === deleteTeamName),
+    [deleteGame, deleteTeamName, players]
+  );
+  const filteredDeletePlayers = useMemo(() => {
+    const query = deletePlayerSearch.trim().toLowerCase();
+    if (!query) return deleteTeamPlayers;
+    return deleteTeamPlayers.filter((player) => player.name.toLowerCase().includes(query));
+  }, [deletePlayerSearch, deleteTeamPlayers]);
+  const selectedDeletePlayer = useMemo(
+    () => deleteTeamPlayers.find((player) => getId(player) === deletePlayerId),
+    [deletePlayerId, deleteTeamPlayers]
   );
 
   const accountingPreview = useMemo(() => {
@@ -153,15 +308,6 @@ const AdminScreen = ({ navigation }) => {
       prizePool: Math.max(totalCollection, 0),
     };
   }, [contestForm.entryFee, contestForm.platformCommissionPercent, contestForm.players, selectedContest?.joined]);
-
-  const filteredPlayers = useMemo(() => {
-    const query = playerSearch.trim().toLowerCase();
-    if (!query) return players;
-
-    return players.filter((player) =>
-      `${player.name} ${player.team} ${player.role}`.toLowerCase().includes(query)
-    );
-  }, [playerSearch, players]);
 
   useFocusEffect(
     useCallback(() => {
@@ -204,7 +350,6 @@ const AdminScreen = ({ navigation }) => {
     const loadContestPlayers = async () => {
       if (!selectedContestId) {
         setContestPlayers([]);
-        setContestPlayerIds([]);
         setResultRows({});
         return;
       }
@@ -214,7 +359,6 @@ const AdminScreen = ({ navigation }) => {
         if (!active) return;
 
         setContestPlayers(scopedPlayers);
-        setContestPlayerIds(scopedPlayers.map(getId));
         setResultRows((current) => {
           const next = {};
           scopedPlayers.forEach((player) => {
@@ -237,15 +381,20 @@ const AdminScreen = ({ navigation }) => {
     };
   }, [selectedContestId]);
 
-  const toggleContestPlayer = useCallback((playerId) => {
-    setContestPlayerIds((current) =>
-      current.includes(playerId)
-        ? current.filter((id) => id !== playerId)
-        : [...current, playerId]
+  const toggleContestTeam = useCallback((teamName) => {
+    setSelectedContestTeamNames((current) =>
+      current.includes(teamName)
+        ? current.filter((item) => item !== teamName)
+        : [...current, teamName]
     );
   }, []);
 
   const submitContest = async () => {
+    if (selectedContestTeamNames.length === 0) {
+      Alert.alert('Teams required', 'Select at least one participating team.');
+      return;
+    }
+
     setSaving(true);
     try {
       const response = await createContest({
@@ -253,9 +402,11 @@ const AdminScreen = ({ navigation }) => {
         players: Number(contestForm.players),
         entryFee: Number(contestForm.entryFee),
         platformCommissionPercent: Number(contestForm.platformCommissionPercent || 10),
-        contestPlayers: contestPlayerIds,
+        contestTeams: selectedContestTeamNames,
       });
       setContestForm(initialContest);
+      setSelectedContestTeamNames([]);
+      setTeamSearch('');
       await refreshContests({ silent: true });
       setSelectedContestId(response.contest?.id || response.contest?._id || '');
       showSuccess('Contest created');
@@ -272,13 +423,38 @@ const AdminScreen = ({ navigation }) => {
     );
   };
 
+  const addBulkPlayerRow = () => {
+    setBulkPlayers((current) => [...current, emptyBulkPlayer()]);
+  };
+
+  const removeBulkPlayerRow = (index) => {
+    setBulkPlayers((current) => (current.length <= 1 ? current : current.filter((_, itemIndex) => itemIndex !== index)));
+  };
+
   const submitBulkTeam = async () => {
+    if (!bulkTeamName.trim()) {
+      Alert.alert('Team required', 'Enter a team name before saving players.');
+      return;
+    }
+
+    if (bulkPlayers.filter((player) => player.name.trim()).length === 0) {
+      Alert.alert('Players required', 'Add at least one player for this team.');
+      return;
+    }
+
+    if (bulkTeamExists) {
+      Alert.alert('Team already added', 'This team name already exists for the selected game.');
+      return;
+    }
+
     setSaving(true);
     try {
       await createTeamPlayers({
-        team: bulkTeamName,
-        players: bulkPlayers.map((player) => ({
+        game: bulkGame,
+        team: bulkTeamName.trim(),
+        players: bulkPlayers.filter((player) => player.name.trim()).map((player) => ({
           ...player,
+          name: player.name.trim(),
           credits: Number(player.credits),
         })),
       });
@@ -334,36 +510,20 @@ const AdminScreen = ({ navigation }) => {
     });
   };
 
-  const submitContestPlayers = async () => {
-    if (!selectedContestId) {
-      Alert.alert('Contest required', 'Select a contest first.');
-      return;
-    }
-
-    if (contestPlayerIds.length === 0) {
-      Alert.alert('Players required', 'Select players participating in this contest.');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await updateContestPlayers({ contestId: selectedContestId, players: contestPlayerIds });
-      await refreshContests({ silent: true });
-      const scopedPlayers = await getContestPlayers(selectedContestId);
-      setContestPlayers(scopedPlayers);
-      showSuccess('Contest players saved');
-    } catch (error) {
-      showError('Contest player update failed', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const submitPlayer = async () => {
+    const selectedTeam = singleTeamNames.find((teamName) => teamName.toLowerCase() === playerForm.team.trim().toLowerCase());
+
+    if (!selectedTeam) {
+      Alert.alert('Select valid team', 'Select an existing team from the selected game before creating a player.');
+      return;
+    }
+
     setSaving(true);
     try {
       await createPlayer({
         ...playerForm,
+        team: selectedTeam,
+        name: playerForm.name.trim(),
         credits: Number(playerForm.credits),
       });
       setPlayerForm(initialPlayer);
@@ -384,6 +544,120 @@ const AdminScreen = ({ navigation }) => {
         ...patch,
       },
     }));
+  };
+
+  const updateResultPlacement = (player, placement) => {
+    const playerId = getId(player);
+    setResultRows((current) => {
+      const next = {
+        ...current,
+        [playerId]: {
+          ...(current[playerId] || { kills: '', placement: '' }),
+          placement,
+        },
+      };
+
+      contestPlayers
+        .filter((item) => item.team === player.team && getId(item) !== playerId)
+        .forEach((teammate) => {
+          const teammateId = getId(teammate);
+          const existing = current[teammateId] || { kills: '', placement: '' };
+          if (!existing.placement) {
+            next[teammateId] = {
+              ...existing,
+              placement,
+            };
+          }
+        });
+
+      return next;
+    });
+  };
+
+  const confirmDeletePlayer = () => {
+    const player = deleteTeamPlayers.find((item) => getId(item) === deletePlayerId);
+
+    if (!player) {
+      Alert.alert('Player required', 'Select a player to delete.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete player?',
+      `Delete ${player.name} from ${player.team}? Historical records stay safe, but this player will be hidden from new contests.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              await deletePlayer(getId(player));
+              setDeletePlayerId('');
+              await refreshPlayers({ silent: true });
+              showSuccess('Player deleted');
+            } catch (error) {
+              showError('Player delete failed', error);
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const confirmDeleteTeam = () => {
+    if (!teamDeleteName) {
+      Alert.alert('Team required', 'Select a team to delete.');
+      return;
+    }
+
+    Alert.alert(
+      'Delete team?',
+      `Are you sure you want to delete this team?\n\n${teamDeleteName} (${teamDeleteGame})\n${teamDeletePlayerCount} player${teamDeletePlayerCount === 1 ? '' : 's'} will be hidden from new contests.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setSaving(true);
+            try {
+              const result = await deleteTeamRequest({
+                game: teamDeleteGame,
+                team: teamDeleteName,
+              });
+
+              setTeamDeleteName('');
+              setTeamDeleteSearch('');
+              setTeamDeleteOpen(false);
+
+              if (deleteGame === teamDeleteGame && deleteTeamName === teamDeleteName) {
+                setDeleteTeamName('');
+                setDeletePlayerId('');
+                setDeleteTeamSearch('');
+                setDeletePlayerSearch('');
+                setDeleteTeamOpen(false);
+                setDeletePlayerOpen(false);
+              }
+
+              await Promise.all([
+                refreshPlayers({ silent: true }),
+                refreshContests({ silent: true }),
+              ]);
+
+              showSuccess(`Team deleted (${result.deletedPlayers || teamDeletePlayerCount} players)`);
+            } catch (error) {
+              showError('Team delete failed', error);
+            } finally {
+              setSaving(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const completeMatch = async () => {
@@ -553,7 +827,6 @@ const AdminScreen = ({ navigation }) => {
         ]);
         const scopedPlayers = await getContestPlayers(selectedContestId);
         setContestPlayers(scopedPlayers);
-        setContestPlayerIds(scopedPlayers.map(getId));
         showSuccess('Player file imported');
       } else {
         const rows = response.leaderboard || await getAdminLeaderboard(selectedContestId);
@@ -579,7 +852,16 @@ const AdminScreen = ({ navigation }) => {
   return (
     <Screen>
       <Header title="Admin" onBack={navigation.canGoBack() ? () => navigation.goBack() : undefined} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 72 : 24}
+        style={styles.keyboardWrap}
+      >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.brandHeader}>
           <BrandLogo size={44} glow />
           <View style={styles.brandCopy}>
@@ -647,6 +929,18 @@ const AdminScreen = ({ navigation }) => {
 
         <GlassCard style={styles.panel}>
           <Text style={styles.panelTitle}>Create Contest</Text>
+          <View style={styles.field}>
+            <Text style={styles.label}>Game</Text>
+            <GamePicker
+              value={contestForm.game}
+              onChange={(game) => {
+                setContestForm((current) => ({ ...current, game }));
+                setSelectedContestTeamNames([]);
+                setTeamSearch('');
+                setContestTeamOpen(false);
+              }}
+            />
+          </View>
           <Field label="Title" value={contestForm.title} onChangeText={(title) => setContestForm((current) => ({ ...current, title }))} />
           <View style={styles.row}>
             <Field label="Spots" keyboardType="number-pad" value={contestForm.players} onChangeText={(players) => setContestForm((current) => ({ ...current, players }))} />
@@ -655,9 +949,22 @@ const AdminScreen = ({ navigation }) => {
           <Field label="Commission %" keyboardType="decimal-pad" value={contestForm.platformCommissionPercent} onChangeText={(platformCommissionPercent) => setContestForm((current) => ({ ...current, platformCommissionPercent }))} />
           <DateTimeField label="Start Time" value={contestForm.startTime} onPress={() => openDatePicker('startTime')} />
           <DateTimeField label="Estimated End" value={contestForm.estimatedEndTime} onPress={() => openDatePicker('estimatedEndTime')} />
-          <Field label="Match Name" value={contestForm.matchName} onChangeText={(matchName) => setContestForm((current) => ({ ...current, matchName }))} />
           <Field label="Tournament" value={contestForm.tournamentName} onChangeText={(tournamentName) => setContestForm((current) => ({ ...current, tournamentName }))} />
-          <Field label="Match ID" value={contestForm.matchIdentifier} onChangeText={(matchIdentifier) => setContestForm((current) => ({ ...current, matchIdentifier }))} />
+          <SearchableSelect
+            label="Select Team"
+            value={selectedContestTeamNames.length ? `${selectedContestTeamNames.length} team(s) selected` : ''}
+            placeholder="Select teams"
+            search={teamSearch}
+            onSearch={setTeamSearch}
+            options={filteredTeamNames}
+            open={contestTeamOpen}
+            onOpenChange={setContestTeamOpen}
+            onSelect={toggleContestTeam}
+            multi
+            selectedValues={selectedContestTeamNames}
+            emptyText="No teams found for this game."
+          />
+          <Text style={styles.statusLine}>{selectedContestTeamNames.length} team(s) selected</Text>
           <View style={styles.accountingBox}>
             <Text style={styles.accountingText}>Current Collection: {accountingPreview.totalCollection.toFixed(2)}</Text>
             <Text style={styles.accountingText}>Max Collection: {accountingPreview.maxCollection.toFixed(2)}</Text>
@@ -669,6 +976,16 @@ const AdminScreen = ({ navigation }) => {
 
         <GlassCard style={styles.panel}>
           <Text style={styles.panelTitle}>Team Player Creation</Text>
+          <View style={styles.field}>
+            <Text style={styles.label}>Game</Text>
+            <GamePicker
+              value={bulkGame}
+              onChange={(game) => {
+                setBulkGame(game);
+                setBulkTeamName('');
+              }}
+            />
+          </View>
           <Field label="Team Name" value={bulkTeamName} onChangeText={setBulkTeamName} />
           {bulkPlayers.map((player, index) => (
             <View key={String(index)} style={styles.bulkRow}>
@@ -688,25 +1005,153 @@ const AdminScreen = ({ navigation }) => {
                 placeholderTextColor={colors.textDim}
                 style={[styles.input, styles.bulkCredits]}
               />
+              <View style={styles.bulkRole}>
+                <RolePicker value={player.role} onChange={(role) => updateBulkPlayer(index, { role })} />
+              </View>
             </View>
           ))}
-          <Button title="Save 5 Players" loading={saving} disabled={saving} onPress={submitBulkTeam} />
+          <Button title="Save Team Players" loading={saving} disabled={saving} onPress={submitBulkTeam} />
         </GlassCard>
 
         <GlassCard style={styles.panel}>
           <Text style={styles.panelTitle}>Single Player</Text>
+          <View style={styles.field}>
+            <Text style={styles.label}>Game</Text>
+            <GamePicker
+              value={playerForm.game}
+              onChange={(game) => {
+                setPlayerForm((current) => ({ ...current, game, team: '' }));
+                setSingleTeamOpen(false);
+              }}
+            />
+          </View>
           <Field label="Name" value={playerForm.name} onChangeText={(name) => setPlayerForm((current) => ({ ...current, name }))} />
-          <Field label="Team" value={playerForm.team} onChangeText={(team) => setPlayerForm((current) => ({ ...current, team }))} />
+          <SearchableSelect
+            label="Team"
+            value={playerForm.team}
+            placeholder="Select existing team"
+            search={playerForm.team}
+            onSearch={(team) => {
+              setPlayerForm((current) => ({ ...current, team }));
+              setSingleTeamOpen(true);
+            }}
+            options={filteredSingleTeamNames}
+            open={singleTeamOpen}
+            onOpenChange={setSingleTeamOpen}
+            onSelect={(team) => {
+              setPlayerForm((current) => ({ ...current, team }));
+              setSingleTeamOpen(false);
+            }}
+            emptyText="No teams found for this game."
+          />
           <View style={styles.row}>
             <Field label="Credits" keyboardType="decimal-pad" value={playerForm.credits} onChangeText={(credits) => setPlayerForm((current) => ({ ...current, credits }))} />
-            <Field label="Role" value={playerForm.role} onChangeText={(role) => setPlayerForm((current) => ({ ...current, role }))} />
+            <View style={styles.field}>
+              <Text style={styles.label}>Role</Text>
+              <RolePicker value={playerForm.role} onChange={(role) => setPlayerForm((current) => ({ ...current, role }))} />
+            </View>
           </View>
           <Button title="Create Player" loading={saving} disabled={saving} onPress={submitPlayer} />
         </GlassCard>
 
         <GlassCard style={styles.panel}>
-          <Text style={styles.panelTitle}>Contest Players</Text>
-          <Field label="Search" value={playerSearch} onChangeText={setPlayerSearch} placeholder="Search player, team, role" />
+          <Text style={styles.panelTitle}>Delete Team</Text>
+          <View style={styles.field}>
+            <Text style={styles.label}>Game</Text>
+            <GamePicker
+              value={teamDeleteGame}
+              onChange={(game) => {
+                setTeamDeleteGame(game);
+                setTeamDeleteName('');
+                setTeamDeleteSearch('');
+                setTeamDeleteOpen(false);
+              }}
+            />
+          </View>
+          <SearchableSelect
+            label="Select Team"
+            value={teamDeleteName}
+            placeholder="Select team"
+            search={teamDeleteSearch}
+            onSearch={setTeamDeleteSearch}
+            options={filteredTeamDeleteNames}
+            open={teamDeleteOpen}
+            onOpenChange={setTeamDeleteOpen}
+            onSelect={(teamName) => {
+              setTeamDeleteName(teamName);
+              setTeamDeleteOpen(false);
+            }}
+            emptyText="No teams found for this game."
+          />
+          {!!teamDeleteName && (
+            <Text style={styles.statusLine}>
+              {teamDeletePlayerCount} active player{teamDeletePlayerCount === 1 ? '' : 's'} will be removed from this team.
+            </Text>
+          )}
+          <Button
+            title="Delete Team"
+            variant="purple"
+            loading={saving}
+            disabled={saving || !teamDeleteName}
+            onPress={confirmDeleteTeam}
+          />
+        </GlassCard>
+
+        <GlassCard style={styles.panel}>
+          <Text style={styles.panelTitle}>Delete Player</Text>
+          <View style={styles.field}>
+            <Text style={styles.label}>Game</Text>
+            <GamePicker
+              value={deleteGame}
+              onChange={(game) => {
+                setDeleteGame(game);
+                setDeleteTeamName('');
+                setDeletePlayerId('');
+                setDeleteTeamSearch('');
+                setDeletePlayerSearch('');
+                setDeleteTeamOpen(false);
+                setDeletePlayerOpen(false);
+              }}
+            />
+          </View>
+          <SearchableSelect
+            label="Select Team"
+            value={deleteTeamName}
+            placeholder="Select team"
+            search={deleteTeamSearch}
+            onSearch={setDeleteTeamSearch}
+            options={filteredDeleteTeamNames}
+            open={deleteTeamOpen}
+            onOpenChange={setDeleteTeamOpen}
+            onSelect={(teamName) => {
+              setDeleteTeamName(teamName);
+              setDeletePlayerId('');
+              setDeletePlayerSearch('');
+              setDeleteTeamOpen(false);
+            }}
+            emptyText="No teams found for this game."
+          />
+          <SearchableSelect
+            label="Select Player"
+            value={selectedDeletePlayer?.name || ''}
+            placeholder={deleteTeamName ? 'Select player' : 'Select a team first'}
+            search={deletePlayerSearch}
+            onSearch={setDeletePlayerSearch}
+            options={filteredDeletePlayers.map((player) => player.name)}
+            open={deletePlayerOpen}
+            onOpenChange={(open) => deleteTeamName && setDeletePlayerOpen(open)}
+            onSelect={(playerName) => {
+              const player = filteredDeletePlayers.find((item) => item.name === playerName);
+              setDeletePlayerId(player ? getId(player) : '');
+              setDeletePlayerOpen(false);
+            }}
+            emptyText={deleteTeamName ? 'No players in selected team.' : 'Select a team first.'}
+          />
+          <Button title="Delete Player" variant="purple" loading={saving} disabled={saving || !deletePlayerId} onPress={confirmDeletePlayer} />
+        </GlassCard>
+
+        <GlassCard style={styles.panel}>
+          <Text style={styles.panelTitle}>Contest Controls</Text>
           <View style={styles.chipWrap}>
             {contests.map((contest) => {
               const contestId = getId(contest);
@@ -722,7 +1167,7 @@ const AdminScreen = ({ navigation }) => {
             })}
           </View>
           <Text style={styles.statusLine}>
-            {(selectedContest?.status || 'upcoming').toUpperCase()} | {contestPlayerIds.length} players selected
+            {(selectedContest?.status || 'upcoming').toUpperCase()} | {contestPlayers.length} active players
           </Text>
           <View style={styles.controlGrid}>
             <Pressable style={styles.controlButton} onPress={() => runAdminControl('live', 'Match marked live')}>
@@ -744,24 +1189,6 @@ const AdminScreen = ({ navigation }) => {
               <Text style={styles.controlText}>Restart</Text>
             </Pressable>
           </View>
-          <View style={styles.importRow}>
-            <Button title="Import CSV/XLSX" variant="outline" loading={saving} disabled={saving || selectedContest?.status !== 'upcoming'} onPress={() => pickImportFile('players')} />
-          </View>
-          <View style={styles.chipWrap}>
-            {filteredPlayers.map((player) => {
-              const playerId = getId(player);
-              const selected = contestPlayerIds.includes(playerId);
-
-              return (
-                <Pressable key={playerId} onPress={() => toggleContestPlayer(playerId)} style={[styles.chip, selected && styles.chipActive]}>
-                  <Text numberOfLines={1} style={[styles.chipText, selected && styles.chipTextActive]}>
-                    {player.name} | {player.team}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Button title="Save Contest Players" loading={saving} disabled={saving || selectedContest?.status !== 'upcoming'} onPress={submitContestPlayers} />
         </GlassCard>
 
         <GlassCard style={styles.panel}>
@@ -798,7 +1225,7 @@ const AdminScreen = ({ navigation }) => {
                   />
                   <TextInput
                     value={row.placement}
-                    onChangeText={(placement) => updateResultRow(playerId, { placement })}
+                    onChangeText={(placement) => updateResultPlacement(player, placement)}
                     keyboardType="number-pad"
                     placeholder="#"
                     placeholderTextColor={colors.textDim}
@@ -827,14 +1254,18 @@ const AdminScreen = ({ navigation }) => {
           />
         )}
       </ScrollView>
+      </KeyboardAvoidingView>
     </Screen>
   );
 };
 
 const styles = StyleSheet.create({
+  keyboardWrap: {
+    flex: 1,
+  },
   content: {
     padding: spacing.screen,
-    paddingBottom: 112,
+    paddingBottom: 156,
     gap: spacing.md,
   },
   brandHeader: {
@@ -894,6 +1325,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+    flexWrap: 'wrap',
   },
   bulkIndex: {
     width: 22,
@@ -907,6 +1339,66 @@ const styles = StyleSheet.create({
   bulkCredits: {
     width: 72,
     textAlign: 'center',
+  },
+  bulkRole: {
+    width: '100%',
+    paddingLeft: 30,
+  },
+  rolePicker: {
+    minHeight: 42,
+    flexDirection: 'row',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  roleOption: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xs,
+  },
+  roleOptionActive: {
+    backgroundColor: 'rgba(85,255,23,0.16)',
+  },
+  roleOptionText: {
+    color: colors.textMuted,
+    fontSize: 10,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  roleOptionTextActive: {
+    color: colors.primary,
+  },
+  gamePicker: {
+    minHeight: 42,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  gameOption: {
+    minHeight: 36,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gameOptionActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(85,255,23,0.14)',
+  },
+  gameOptionText: {
+    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '900',
+    maxWidth: 96,
+  },
+  gameOptionTextActive: {
+    color: colors.primary,
   },
   controlGrid: {
     flexDirection: 'row',
@@ -1015,6 +1507,51 @@ const styles = StyleSheet.create({
   datePlaceholder: {
     color: colors.textDim,
   },
+  selectButton: {
+    minHeight: 44,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  selectText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  selectPlaceholder: {
+    color: colors.textDim,
+  },
+  selectChevron: {
+    color: colors.primary,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  selectPanel: {
+    marginTop: spacing.xs,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  selectSearch: {
+    minHeight: 40,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+    color: colors.text,
+    paddingHorizontal: spacing.md,
+    fontWeight: '800',
+  },
+  selectList: {
+    maxHeight: 178,
+  },
   accountingBox: {
     borderRadius: 10,
     borderWidth: 1,
@@ -1031,6 +1568,41 @@ const styles = StyleSheet.create({
   accountingPrize: {
     color: colors.coin,
     fontSize: 14,
+    fontWeight: '900',
+  },
+  teamDropdown: {
+    maxHeight: 178,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  teamOption: {
+    minHeight: 42,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSoft,
+  },
+  teamOptionActive: {
+    backgroundColor: 'rgba(85,255,23,0.12)',
+  },
+  teamOptionText: {
+    flex: 1,
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: '900',
+  },
+  teamOptionTextActive: {
+    color: colors.primary,
+  },
+  teamSelectedMark: {
+    color: colors.primary,
+    fontSize: 9,
     fontWeight: '900',
   },
   chipWrap: {

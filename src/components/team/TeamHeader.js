@@ -11,9 +11,9 @@ const Stat = ({ label, value, highlight, icon }) => (
   </View>
 );
 
-const TeamHeader = ({ selectedCount, creditsLeft, usedCredits }) => (
+const TeamHeader = ({ selectedCount, creditsLeft, usedCredits, maxPlayers = 8 }) => (
   <GlassCard style={styles.container}>
-    <Stat label="Players" value={`${selectedCount}/8`} />
+    <Stat label="Players" value={`${selectedCount}/${maxPlayers}`} />
     <View style={styles.divider} />
     <Stat label="Credits Left" value={Number(creditsLeft || 0).toFixed(1)} highlight />
     <View style={styles.divider} />

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import AnimatedView from '../../components/common/AnimatedView';
 import CoinBadge from '../../components/common/CoinBadge';
@@ -15,7 +15,6 @@ import spacing from '../../constants/spacing';
 import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import useAuth from '../../hooks/useAuth';
-import { maybeShowInterstitial } from '../../services/adMobService';
 import { showError } from '../../utils/feedback';
 
 const categories = [
@@ -24,6 +23,7 @@ const categories = [
   { label: 'Mega Contests', icon: 'diamond' },
   { label: 'Practice', icon: 'game-controller' },
 ];
+const gameOptions = ['All', 'BGMI', 'Free Fire', 'Valorant', 'COD Mobile'];
 
 const Hero = ({ onPress }) => (
   <Pressable onPress={onPress}>
@@ -50,8 +50,6 @@ const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const {
     contests,
-    joinContest,
-    joiningContestIds,
     loading,
     network,
     refreshContests,
@@ -59,6 +57,14 @@ const HomeScreen = ({ navigation }) => {
     setActiveContestId,
   } = useAppData();
   const fade = useRef(new Animated.Value(0)).current;
+  const [selectedGame, setSelectedGame] = useState('All');
+  const visibleContests = useMemo(
+    () =>
+      selectedGame === 'All'
+        ? contests
+        : contests.filter((contest) => (contest.game || 'BGMI') === selectedGame),
+    [contests, selectedGame]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -85,32 +91,24 @@ const HomeScreen = ({ navigation }) => {
     }, [contests.length, fade, refreshContests, refreshWallet])
   );
 
-  const handleJoin = async (contest) => {
+  const handleJoin = (contest) => {
     try {
-      if (contest.userJoined && !contest.teamCreated) {
+      if (contest.teamCreated) {
         setActiveContestId(contest.id);
-        navigation.navigate('TeamBuilder', { contest });
+        navigation.navigate('Leaderboard', { contestId: contest.id });
         return;
       }
 
-      const response = await joinContest(contest);
-      if (!response) {
+      if (contest.userJoined) {
+        setActiveContestId(contest.id);
+        navigation.navigate('TeamBuilder', { contest, contestId: contest.id });
         return;
       }
 
       setActiveContestId(contest.id);
-      if (!user?.premium?.active) {
-        maybeShowInterstitial().catch(() => undefined);
-      }
-      navigation.navigate('TeamBuilder', { contest });
+      navigation.navigate('TeamBuilder', { contest, contestId: contest.id });
     } catch (error) {
-      if (String(error?.message || '').toLowerCase().includes('insufficient')) {
-        navigation.navigate('EarnCoins', {
-          neededCoins: Math.max(Number(contest.entryFee || 0) - Number(user?.coins || 0), 0),
-        });
-        return;
-      }
-      showError('Join failed', error);
+      showError('Unable to open team builder', error);
     }
   };
 
@@ -170,20 +168,42 @@ const HomeScreen = ({ navigation }) => {
           </Pressable>
         </View>
 
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.gameFilter}
+        >
+          {gameOptions.map((game) => {
+            const selected = selectedGame === game;
+            return (
+              <Pressable
+                key={game}
+                onPress={() => setSelectedGame(game)}
+                style={[styles.gamePill, selected && styles.gamePillActive]}
+              >
+                <Text numberOfLines={1} style={[styles.gamePillText, selected && styles.gamePillTextActive]}>
+                  {game}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         {loading.contests && contests.length === 0 ? (
           <Loader />
         ) : (
           <Animated.View style={{ opacity: fade }}>
-            {contests.map((contest, index) => (
+            {visibleContests.map((contest, index) => (
               <AnimatedView key={contest.id} delay={index * 80}>
                 <ContestCard
                   contest={contest}
                   onJoin={() => handleJoin(contest)}
-                  loading={Boolean(joiningContestIds[contest.id])}
-                  disabled={Boolean(joiningContestIds[contest.id])}
                 />
               </AnimatedView>
             ))}
+            {visibleContests.length === 0 && (
+              <Text style={styles.emptyText}>No contests for this game yet.</Text>
+            )}
           </Animated.View>
         )}
       </ScrollView>
@@ -361,6 +381,39 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 13,
     fontWeight: '900',
+  },
+  gameFilter: {
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+  },
+  gamePill: {
+    minHeight: 34,
+    borderRadius: 9,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  gamePillActive: {
+    borderColor: colors.primary,
+    backgroundColor: 'rgba(85,255,23,0.14)',
+  },
+  gamePillText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '900',
+  },
+  gamePillTextActive: {
+    color: colors.primary,
+  },
+  emptyText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+    paddingVertical: spacing.xl,
   },
 });
 

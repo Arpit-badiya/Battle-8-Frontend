@@ -16,22 +16,22 @@ import { getMyTeam } from '../../services/contestService';
 import { getContestPlayers } from '../../services/playerService';
 import { showError } from '../../utils/feedback';
 
-const roles = ['All', 'Assaulter', 'Support', 'Sniper', 'IGL'];
-const MAX_PLAYERS = 5;
+const roles = ['All', 'IGL', 'Assaulter', 'Supporter'];
+const MAX_PLAYERS = 8;
 const MAX_CREDITS = 75;
 const PLAYER_ROW_HEIGHT = 66;
+const getPlayerId = (player = {}) => String(player.id || player._id || '');
 
 const TeamBuilderScreen = ({ navigation, route }) => {
   const routeContest = route.params?.contest;
-  const { contests, createTeam, creatingTeam, players, refreshPlayers, setActiveContestId } = useAppData();
+  const { contests, creatingTeam, players, refreshPlayers } = useAppData();
   const contest = contests.find((item) => (item.id || item._id) === (routeContest?.id || routeContest?._id)) || routeContest;
   const contestId = contest?.id || contest?._id;
   const [selected, setSelected] = useState([]);
   const [role, setRole] = useState('All');
   const [contestPlayers, setContestPlayers] = useState([]);
   const [selectedTeamName, setSelectedTeamName] = useState('');
-  const [captain, setCaptain] = useState('');
-  const [viceCaptain, setViceCaptain] = useState('');
+  const [selectedPlayerMap, setSelectedPlayerMap] = useState({});
   const [myTeam, setMyTeam] = useState(null);
   const [loadingContestPlayers, setLoadingContestPlayers] = useState(false);
   const isContestLocked = ['live', 'completed', 'cancelled'].includes(contest?.status);
@@ -39,8 +39,7 @@ const TeamBuilderScreen = ({ navigation, route }) => {
   useEffect(() => {
     setSelected([]);
     setSelectedTeamName('');
-    setCaptain('');
-    setViceCaptain('');
+    setSelectedPlayerMap({});
     setMyTeam(null);
   }, [contestId]);
 
@@ -52,7 +51,7 @@ const TeamBuilderScreen = ({ navigation, route }) => {
         try {
           setLoadingContestPlayers(true);
           const [teamResponse, , scopedPlayers] = await Promise.all([
-            contest?.teamCreated || isContestLocked ? getMyTeam(contestId).catch(() => null) : Promise.resolve(null),
+            contest?.teamCreated ? getMyTeam(contestId).catch(() => null) : Promise.resolve(null),
             refreshPlayers({ silent: players.length > 0 }),
             getContestPlayers(contestId),
           ]);
@@ -77,7 +76,7 @@ const TeamBuilderScreen = ({ navigation, route }) => {
       return () => {
         active = false;
       };
-    }, [contest?.teamCreated, contestId, isContestLocked, players.length, refreshPlayers])
+    }, [contest?.teamCreated, contestId, players.length, refreshPlayers])
   );
 
   const teamNames = useMemo(
@@ -87,9 +86,39 @@ const TeamBuilderScreen = ({ navigation, route }) => {
   const availablePlayers = selectedTeamName
     ? contestPlayers.filter((player) => player.team === selectedTeamName)
     : contestPlayers;
+  const contestPlayersById = useMemo(
+    () => new Map(contestPlayers.map((player) => [getPlayerId(player), player]).filter(([id]) => Boolean(id))),
+    [contestPlayers]
+  );
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+
+  useEffect(() => {
+    if (selected.length === 0 || contestPlayersById.size === 0) {
+      return;
+    }
+
+    setSelectedPlayerMap((current) => {
+      let changed = false;
+      const next = { ...current };
+
+      selected.forEach((playerId) => {
+        const latestPlayer = contestPlayersById.get(playerId);
+        if (latestPlayer && next[playerId] !== latestPlayer) {
+          next[playerId] = latestPlayer;
+          changed = true;
+        }
+      });
+
+      return changed ? next : current;
+    });
+  }, [contestPlayersById, selected]);
+
   const selectedPlayers = useMemo(
-    () => availablePlayers.filter((player) => selected.includes(player.id || player._id)),
-    [availablePlayers, selected]
+    () =>
+      selected
+        .map((playerId) => selectedPlayerMap[playerId] || contestPlayersById.get(playerId))
+        .filter(Boolean),
+    [contestPlayersById, selected, selectedPlayerMap]
   );
   const usedCredits = selectedPlayers.reduce((sum, player) => sum + Number(player.credits || 0), 0);
   const creditsLeft = Number((MAX_CREDITS - usedCredits).toFixed(1));
@@ -107,15 +136,18 @@ const TeamBuilderScreen = ({ navigation, route }) => {
   );
 
   const togglePlayer = useCallback((player) => {
-    const playerId = player.id || player._id;
+    const playerId = getPlayerId(player);
     if (!playerId || creatingTeam || isContestLocked) {
       return;
     }
 
     setSelected((current) => {
       if (current.includes(playerId)) {
-        if (captain === playerId) setCaptain('');
-        if (viceCaptain === playerId) setViceCaptain('');
+        setSelectedPlayerMap((snapshot) => {
+          const next = { ...snapshot };
+          delete next[playerId];
+          return next;
+        });
         return current.filter((id) => id !== playerId);
       }
       if (!selectedTeamName) {
@@ -123,23 +155,27 @@ const TeamBuilderScreen = ({ navigation, route }) => {
         return current;
       }
       if (current.length >= MAX_PLAYERS) {
-        Alert.alert('Team full', 'You can select only 5 players.');
+        Alert.alert('Team full', `You can select only ${MAX_PLAYERS} players.`);
         return current;
       }
-      const currentCredits = availablePlayers
+      const currentCredits = contestPlayers
         .filter((item) => current.includes(item.id || item._id))
         .reduce((sum, item) => sum + Number(item.credits || 0), 0);
       if (currentCredits + Number(player.credits || 0) > MAX_CREDITS) {
         Alert.alert('Credits exceeded', 'Choose a lower credit player to stay under 75 credits.');
         return current;
       }
+      setSelectedPlayerMap((snapshot) => ({
+        ...snapshot,
+        [playerId]: player,
+      }));
       return [...current, playerId];
     });
-  }, [availablePlayers, captain, creatingTeam, isContestLocked, selectedTeamName, viceCaptain]);
+  }, [contestPlayers, creatingTeam, isContestLocked, selectedTeamName]);
 
   const handleSubmit = useCallback(async () => {
     if (selected.length !== MAX_PLAYERS) {
-      Alert.alert('Select 5 players', 'Complete your team before continuing.');
+      Alert.alert(`Select ${MAX_PLAYERS} players`, 'Complete your team before continuing.');
       return;
     }
 
@@ -153,51 +189,33 @@ const TeamBuilderScreen = ({ navigation, route }) => {
       return;
     }
 
-    try {
-      const response = await createTeam({ contestId, players: selected, totalCredits: usedCredits, captain, viceCaptain });
-      if (!response) {
-        return;
-      }
-      setSelected([]);
-      setActiveContestId(contestId);
-      navigation.navigate('MainTabs', { screen: 'Leaderboard', params: { contestId } });
-    } catch (error) {
-      showError('Team creation failed', error);
-    }
-  }, [captain, contestId, createTeam, navigation, selected, setActiveContestId, usedCredits, viceCaptain]);
+    navigation.navigate('CaptainSelection', {
+      contest,
+      contestId,
+      selectedPlayerIds: selected,
+      selectedPlayers,
+      selectedTeamName,
+      totalCredits: usedCredits,
+    });
+  }, [contest, contestId, navigation, selected, selectedPlayers, selectedTeamName, usedCredits]);
 
   const chooseTeam = useCallback((teamName) => {
     if (creatingTeam || isContestLocked) return;
     setSelectedTeamName(teamName);
-    setSelected([]);
-    setCaptain('');
-    setViceCaptain('');
   }, [creatingTeam, isContestLocked]);
-
-  const markCaptain = useCallback((playerId) => {
-    if (!selected.includes(playerId)) return;
-    setCaptain(playerId);
-    if (viceCaptain === playerId) setViceCaptain('');
-  }, [selected, viceCaptain]);
-
-  const markViceCaptain = useCallback((playerId) => {
-    if (!selected.includes(playerId)) return;
-    setViceCaptain(playerId);
-    if (captain === playerId) setCaptain('');
-  }, [captain, selected]);
 
   const renderPlayer = useCallback(
     ({ item, index }) => (
       <AnimatedView delay={index * 20}>
         <PlayerCard
           player={item}
-          selected={selected.includes(item.id || item._id)}
+          selected={selectedSet.has(getPlayerId(item))}
           disabled={creatingTeam || isContestLocked}
           onToggle={() => togglePlayer(item)}
         />
       </AnimatedView>
     ),
-    [creatingTeam, isContestLocked, selected, togglePlayer]
+    [creatingTeam, isContestLocked, selectedSet, togglePlayer]
   );
 
   const getPlayerLayout = useCallback(
@@ -237,7 +255,7 @@ const TeamBuilderScreen = ({ navigation, route }) => {
           ))}
         </GlassCard>
       ) : (
-        <TeamHeader selectedCount={selected.length} creditsLeft={creditsLeft} usedCredits={usedCredits} />
+        <TeamHeader selectedCount={selected.length} creditsLeft={creditsLeft} usedCredits={usedCredits} maxPlayers={MAX_PLAYERS} />
       )}
 
       {!myTeam && (
@@ -277,24 +295,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
           </Text>
           <Text style={styles.creditHead}>Credits</Text>
         </View>
-        {!myTeam && selectedPlayers.length > 0 && (
-          <View style={styles.captainPanel}>
-            {selectedPlayers.map((player) => {
-              const playerId = player.id || player._id;
-              return (
-                <View key={playerId} style={styles.captainRow}>
-                  <Text numberOfLines={1} style={styles.captainName}>{player.name}</Text>
-                  <Pressable onPress={() => markCaptain(playerId)} style={[styles.captainChip, captain === playerId && styles.captainChipActive]}>
-                    <Text style={[styles.captainChipText, captain === playerId && styles.captainChipTextActive]}>C</Text>
-                  </Pressable>
-                  <Pressable onPress={() => markViceCaptain(playerId)} style={[styles.captainChip, viceCaptain === playerId && styles.captainChipActive]}>
-                    <Text style={[styles.captainChipText, viceCaptain === playerId && styles.captainChipTextActive]}>VC</Text>
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-        )}
         <FlatList
           data={filteredPlayers}
           keyExtractor={(item) => item.id || item._id}
@@ -319,7 +319,7 @@ const TeamBuilderScreen = ({ navigation, route }) => {
       {!myTeam && (
       <View style={styles.footer}>
         <Button
-          title={selected.length === MAX_PLAYERS ? 'Submit Team' : `Submit (${selected.length}/5)`}
+          title={selected.length === MAX_PLAYERS ? 'Next' : `Select Players (${selected.length}/${MAX_PLAYERS})`}
           disabled={selected.length !== MAX_PLAYERS || creatingTeam || loadingContestPlayers || isContestLocked}
           loading={creatingTeam}
           onPress={handleSubmit}
@@ -540,7 +540,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.screen,
     right: spacing.screen,
-    bottom: spacing.xl,
+    bottom: spacing.xxl,
   },
 });
 

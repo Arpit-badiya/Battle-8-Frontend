@@ -2,8 +2,8 @@ import axios from 'axios';
 
 export const API_BASE_URL =
   process.env.EXPO_PUBLIC_API_BASE_URL ||
-  'http://10.153.25.80:5000/api';
-  // 'https://battle-8-backend.onrender.com/api'
+  // 'http://10.153.25.80:5000/api';
+  'https://battle-8-backend.onrender.com/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
