@@ -24,6 +24,11 @@ const categories = [
   { label: 'Practice', icon: 'game-controller' },
 ];
 const gameOptions = ['All', 'BGMI', 'Free Fire', 'Valorant', 'COD Mobile'];
+const typeOptions = [
+  { value: 'All', label: 'All' },
+  { value: 'fantasy', label: 'Fantasy' },
+  { value: 'team', label: 'Team' },
+];
 
 const Hero = ({ onPress }) => (
   <Pressable onPress={onPress}>
@@ -99,13 +104,13 @@ const HomeScreen = ({ navigation }) => {
         return;
       }
 
-      if (contest.userJoined) {
-        setActiveContestId(contest.id);
-        navigation.navigate('TeamBuilder', { contest, contestId: contest.id });
+      setActiveContestId(contest.id);
+
+      if (contest.contestType === 'team') {
+        navigation.navigate('TeamContestBuilder', { contest, contestId: contest.id });
         return;
       }
 
-      setActiveContestId(contest.id);
       navigation.navigate('TeamBuilder', { contest, contestId: contest.id });
     } catch (error) {
       showError('Unable to open team builder', error);

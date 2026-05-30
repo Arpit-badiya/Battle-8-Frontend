@@ -59,16 +59,21 @@ const ContestDetailsScreen = ({ navigation }) => {
 
   return (
     <Screen>
-      <Text style={styles.title}>My Contests</Text>
-      <GlassCard style={styles.tabs}>
-        {tabs.map((tab) => (
-          <Pressable key={tab} onPress={() => setActive(tab)} style={[styles.tab, active === tab && styles.activeTab]}>
-            <Text style={[styles.tabText, active === tab && styles.activeText]}>{tab}</Text>
-          </Pressable>
-        ))}
-      </GlassCard>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text style={styles.title}>My Contests</Text>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <GlassCard style={styles.tabs}>
+          {tabs.map((tab) => (
+            <Pressable key={tab} onPress={() => setActive(tab)} style={[styles.tab, active === tab && styles.activeTab]}>
+              <Text style={[styles.tabText, active === tab && styles.activeText]}>{tab}</Text>
+            </Pressable>
+          ))}
+        </GlassCard>
+
         {loading.contests && contests.length === 0 ? (
           <Loader />
         ) : (
@@ -93,19 +98,23 @@ const ContestDetailsScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  content: {
+    paddingHorizontal: spacing.screen,
+    paddingTop: spacing.xl,
+    paddingBottom: 110,
+  },
   title: {
     color: colors.text,
     fontSize: 20,
     fontWeight: '900',
     textAlign: 'center',
-    marginTop: spacing.xl,
     marginBottom: spacing.xl,
   },
   tabs: {
     flexDirection: 'row',
-    marginHorizontal: spacing.screen,
     padding: 4,
     borderRadius: 20,
+    marginBottom: spacing.xl,
   },
   tab: {
     flex: 1,
@@ -126,11 +135,6 @@ const styles = StyleSheet.create({
   },
   activeText: {
     color: colors.white,
-  },
-  content: {
-    paddingHorizontal: spacing.screen,
-    paddingTop: spacing.xl,
-    paddingBottom: 110,
   },
   emptyText: {
     color: colors.textMuted,

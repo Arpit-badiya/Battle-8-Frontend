@@ -149,6 +149,8 @@ const normalizeContest = (
   tournamentName: contest.tournamentName || '',
   matchIdentifier: contest.matchIdentifier || '',
   matchDateTime: contest.matchDateTime || contest.startTime || contest.startsAt || null,
+  contestType: contest.contestType || 'fantasy',
+  contestTeams: Array.isArray(contest.contestTeams) ? contest.contestTeams : [],
 });
 
 const normalizeLeaderboardRow = (
@@ -277,6 +279,31 @@ export const getMyTeam =
 
     const response = await api.get(`/team/contest/${contestId}/me`);
     return response.data?.team || null;
+  };
+
+export const createTeamContestEntry =
+  async ({
+    contestId,
+    selectedTeams,
+    captainTeam,
+    viceCaptainTeam,
+  }) => {
+    if (!contestId) {
+      throw new Error('Contest ID missing');
+    }
+
+    if (!Array.isArray(selectedTeams) || selectedTeams.length !== 8) {
+      throw new Error('Select exactly 8 teams');
+    }
+
+    const response = await api.post('/team/team-contest/create', {
+      contestId,
+      selectedTeams,
+      captainTeam,
+      viceCaptainTeam,
+    });
+
+    return response.data;
   };
 
 export const getLeaderboard =

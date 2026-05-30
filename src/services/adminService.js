@@ -72,6 +72,19 @@ export const processResults = async ({ contestId, playerResults, matchName, tour
   return response.data;
 };
 
+export const processTeamResults = async ({ contestId, teamResults, matchName, tournamentName, matchIdentifier, matchDateTime }) => {
+  const response = await api.post('/results/process-team', {
+    contestId,
+    teamResults,
+    matchName,
+    tournamentName,
+    matchIdentifier,
+    matchDateTime,
+  });
+
+  return response.data;
+};
+
 export const savePlayerResult = async ({ contestId, playerId, kills, placement }) => {
   const response = await api.post('/results/player', {
     contestId,

@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import AnimatedView from '../../components/common/AnimatedView';
 import Button from '../../components/common/Button';
 import GlassCard from '../../components/common/GlassCard';
 import Header from '../../components/common/Header';
 import Screen from '../../components/common/Screen';
+import SearchableSelector from '../../components/common/SearchableSelector';
 import PlayerCard from '../../components/team/PlayerCard';
 import TeamHeader from '../../components/team/TeamHeader';
 import colors from '../../constants/colors';
@@ -25,22 +26,38 @@ const getPlayerId = (player = {}) => String(player.id || player._id || '');
 const TeamBuilderScreen = ({ navigation, route }) => {
   const routeContest = route.params?.contest;
   const { contests, creatingTeam, players, refreshPlayers } = useAppData();
-  const contest = contests.find((item) => (item.id || item._id) === (routeContest?.id || routeContest?._id)) || routeContest;
+  const contest =
+    contests.find((item) => (item.id || item._id) === (routeContest?.id || routeContest?._id)) ||
+    routeContest;
   const contestId = contest?.id || contest?._id;
+
+  // selected: array of player id strings (order preserved)
+  // selectedPlayerMap: id → player object (survives team tab switches)
   const [selected, setSelected] = useState([]);
+  const [selectedPlayerMap, setSelectedPlayerMap] = useState({});
   const [role, setRole] = useState('All');
   const [contestPlayers, setContestPlayers] = useState([]);
   const [selectedTeamName, setSelectedTeamName] = useState('');
-  const [selectedPlayerMap, setSelectedPlayerMap] = useState({});
   const [myTeam, setMyTeam] = useState(null);
   const [loadingContestPlayers, setLoadingContestPlayers] = useState(false);
+
+  // Keep a ref so togglePlayer always reads the latest selectedTeamName
+  // without needing to be in its dependency array (avoids stale-closure bug
+  // when FlatList renders with a cached renderItem).
+  const selectedTeamNameRef = useRef(selectedTeamName);
+  useEffect(() => {
+    selectedTeamNameRef.current = selectedTeamName;
+  }, [selectedTeamName]);
+
   const isContestLocked = ['live', 'completed', 'cancelled'].includes(contest?.status);
 
+  // Reset all local state when the contest changes
   useEffect(() => {
     setSelected([]);
-    setSelectedTeamName('');
     setSelectedPlayerMap({});
+    setSelectedTeamName('');
     setMyTeam(null);
+    setRole('All');
   }, [contestId]);
 
   useFocusEffect(
@@ -80,31 +97,32 @@ const TeamBuilderScreen = ({ navigation, route }) => {
   );
 
   const teamNames = useMemo(
-    () => [...new Set(contestPlayers.map((player) => player.team).filter(Boolean))].sort(),
+    () => [...new Set(contestPlayers.map((p) => p.team).filter(Boolean))].sort(),
     [contestPlayers]
   );
-  const availablePlayers = selectedTeamName
-    ? contestPlayers.filter((player) => player.team === selectedTeamName)
-    : contestPlayers;
-  const contestPlayersById = useMemo(
-    () => new Map(contestPlayers.map((player) => [getPlayerId(player), player]).filter(([id]) => Boolean(id))),
-    [contestPlayers]
-  );
-  const selectedSet = useMemo(() => new Set(selected), [selected]);
 
+  const contestPlayersById = useMemo(
+    () =>
+      new Map(
+        contestPlayers
+          .map((p) => [getPlayerId(p), p])
+          .filter(([id]) => Boolean(id))
+      ),
+    [contestPlayers]
+  );
+
+  // Keep selectedPlayerMap in sync when contestPlayers refreshes
   useEffect(() => {
-    if (selected.length === 0 || contestPlayersById.size === 0) {
-      return;
-    }
+    if (selected.length === 0 || contestPlayersById.size === 0) return;
 
     setSelectedPlayerMap((current) => {
       let changed = false;
       const next = { ...current };
 
       selected.forEach((playerId) => {
-        const latestPlayer = contestPlayersById.get(playerId);
-        if (latestPlayer && next[playerId] !== latestPlayer) {
-          next[playerId] = latestPlayer;
+        const latest = contestPlayersById.get(playerId);
+        if (latest && next[playerId] !== latest) {
+          next[playerId] = latest;
           changed = true;
         }
       });
@@ -113,77 +131,106 @@ const TeamBuilderScreen = ({ navigation, route }) => {
     });
   }, [contestPlayersById, selected]);
 
+  const selectedSet = useMemo(() => new Set(selected), [selected]);
+
   const selectedPlayers = useMemo(
     () =>
       selected
-        .map((playerId) => selectedPlayerMap[playerId] || contestPlayersById.get(playerId))
+        .map((id) => selectedPlayerMap[id] || contestPlayersById.get(id))
         .filter(Boolean),
     [contestPlayersById, selected, selectedPlayerMap]
   );
-  const usedCredits = selectedPlayers.reduce((sum, player) => sum + Number(player.credits || 0), 0);
+
+  const usedCredits = useMemo(
+    () => selectedPlayers.reduce((sum, p) => sum + Number(p.credits || 0), 0),
+    [selectedPlayers]
+  );
   const creditsLeft = Number((MAX_CREDITS - usedCredits).toFixed(1));
-  const filteredPlayers = role === 'All' ? availablePlayers : availablePlayers.filter((player) => player.role === role);
+
+  const availablePlayers = useMemo(
+    () =>
+      selectedTeamName
+        ? contestPlayers.filter((p) => p.team === selectedTeamName)
+        : contestPlayers,
+    [contestPlayers, selectedTeamName]
+  );
+
+  const filteredPlayers = useMemo(
+    () =>
+      role === 'All'
+        ? availablePlayers
+        : availablePlayers.filter((p) => p.role === role),
+    [availablePlayers, role]
+  );
+
   const roleStats = useMemo(
     () =>
       roles
-        .filter((item) => item !== 'All')
-        .map((item) => ({
-          label: item,
-          current: selectedPlayers.filter((player) => player.role === item).length,
-          total: availablePlayers.filter((player) => player.role === item).length,
+        .filter((r) => r !== 'All')
+        .map((r) => ({
+          label: r,
+          current: selectedPlayers.filter((p) => p.role === r).length,
+          total: availablePlayers.filter((p) => p.role === r).length,
         })),
     [availablePlayers, selectedPlayers]
   );
 
-  const togglePlayer = useCallback((player) => {
-    const playerId = getPlayerId(player);
-    if (!playerId || creatingTeam || isContestLocked) {
-      return;
-    }
+  // togglePlayer uses a ref for selectedTeamName so the FlatList renderItem
+  // callback never goes stale when the user switches team tabs.
+  const togglePlayer = useCallback(
+    (player) => {
+      const playerId = getPlayerId(player);
+      if (!playerId || creatingTeam || isContestLocked) return;
 
-    setSelected((current) => {
-      if (current.includes(playerId)) {
-        setSelectedPlayerMap((snapshot) => {
-          const next = { ...snapshot };
+      const isSelected = selectedSet.has(playerId);
+
+      if (isSelected) {
+        // Deselect: remove from both arrays atomically via functional updates
+        setSelected((prev) => prev.filter((id) => id !== playerId));
+        setSelectedPlayerMap((prev) => {
+          const next = { ...prev };
           delete next[playerId];
           return next;
         });
-        return current.filter((id) => id !== playerId);
+        return;
       }
-      if (!selectedTeamName) {
+
+      // Select guards
+      if (!selectedTeamNameRef.current) {
         Alert.alert('Select team', 'Choose an esports team before selecting players.');
-        return current;
+        return;
       }
-      if (current.length >= MAX_PLAYERS) {
+      if (selected.length >= MAX_PLAYERS) {
         Alert.alert('Team full', `You can select only ${MAX_PLAYERS} players.`);
-        return current;
+        return;
       }
-      const currentCredits = contestPlayers
-        .filter((item) => current.includes(item.id || item._id))
-        .reduce((sum, item) => sum + Number(item.credits || 0), 0);
+      const currentCredits = selectedPlayers.reduce(
+        (sum, p) => sum + Number(p.credits || 0),
+        0
+      );
       if (currentCredits + Number(player.credits || 0) > MAX_CREDITS) {
         Alert.alert('Credits exceeded', 'Choose a lower credit player to stay under 75 credits.');
-        return current;
+        return;
       }
-      setSelectedPlayerMap((snapshot) => ({
-        ...snapshot,
-        [playerId]: player,
-      }));
-      return [...current, playerId];
-    });
-  }, [contestPlayers, creatingTeam, isContestLocked, selectedTeamName]);
 
-  const handleSubmit = useCallback(async () => {
+      // Add to both maps atomically
+      setSelected((prev) => [...prev, playerId]);
+      setSelectedPlayerMap((prev) => ({ ...prev, [playerId]: player }));
+    },
+    // selectedSet and selectedPlayers are derived from selected — including them
+    // keeps the guards accurate without stale reads.
+    [creatingTeam, isContestLocked, selected, selectedPlayers, selectedSet]
+  );
+
+  const handleSubmit = useCallback(() => {
     if (selected.length !== MAX_PLAYERS) {
       Alert.alert(`Select ${MAX_PLAYERS} players`, 'Complete your team before continuing.');
       return;
     }
-
     if (!contestId) {
       Alert.alert('Contest missing', 'Go back and select a contest again.');
       return;
     }
-
     if (usedCredits > MAX_CREDITS) {
       Alert.alert('Credits exceeded', 'Update your team before continuing.');
       return;
@@ -199,23 +246,33 @@ const TeamBuilderScreen = ({ navigation, route }) => {
     });
   }, [contest, contestId, navigation, selected, selectedPlayers, selectedTeamName, usedCredits]);
 
-  const chooseTeam = useCallback((teamName) => {
-    if (creatingTeam || isContestLocked) return;
-    setSelectedTeamName(teamName);
-  }, [creatingTeam, isContestLocked]);
+  const chooseTeam = useCallback(
+    (teamName) => {
+      if (creatingTeam || isContestLocked) return;
+      setSelectedTeamName(teamName);
+    },
+    [creatingTeam, isContestLocked]
+  );
+
+  // extraData includes selectedSet AND togglePlayer so FlatList re-renders
+  // correctly when either the selection or the callback changes.
+  const flatListExtraData = useMemo(
+    () => ({ selectedSet, togglePlayer }),
+    [selectedSet, togglePlayer]
+  );
 
   const renderPlayer = useCallback(
     ({ item, index }) => (
       <AnimatedView delay={index * 20}>
         <PlayerCard
           player={item}
-          selected={selectedSet.has(getPlayerId(item))}
+          selected={flatListExtraData.selectedSet.has(getPlayerId(item))}
           disabled={creatingTeam || isContestLocked}
-          onToggle={() => togglePlayer(item)}
+          onToggle={() => flatListExtraData.togglePlayer(item)}
         />
       </AnimatedView>
     ),
-    [creatingTeam, isContestLocked, selectedSet, togglePlayer]
+    [creatingTeam, isContestLocked, flatListExtraData]
   );
 
   const getPlayerLayout = useCallback(
@@ -234,6 +291,7 @@ const TeamBuilderScreen = ({ navigation, route }) => {
         onBack={() => navigation.goBack()}
         right={<Ionicons name="help-circle-outline" size={28} color={colors.text} />}
       />
+
       {myTeam ? (
         <GlassCard style={styles.myTeamCard}>
           <Text style={styles.myTeamTitle}>My Team</Text>
@@ -246,46 +304,61 @@ const TeamBuilderScreen = ({ navigation, route }) => {
             <View key={player._id || player.id} style={styles.myPlayerRow}>
               <View style={styles.myPlayerMain}>
                 <Text style={styles.myPlayerName}>
-                  {player.name} {player.isCaptain ? '(C)' : player.isViceCaptain ? '(VC)' : ''}
+                  {player.name}{player.isCaptain ? ' (C)' : player.isViceCaptain ? ' (VC)' : ''}
                 </Text>
-                <Text style={styles.myPlayerMeta}>{player.active ? 'Active' : 'Inactive'} | {player.kills || 0} kills | #{player.placement || '-'}</Text>
+                <Text style={styles.myPlayerMeta}>
+                  {player.active ? 'Active' : 'Inactive'} | {player.kills || 0} kills | #{player.placement || '-'}
+                </Text>
               </View>
               <Text style={styles.myPlayerPoints}>{player.points || 0}</Text>
             </View>
           ))}
         </GlassCard>
       ) : (
-        <TeamHeader selectedCount={selected.length} creditsLeft={creditsLeft} usedCredits={usedCredits} maxPlayers={MAX_PLAYERS} />
+        <TeamHeader
+          selectedCount={selected.length}
+          creditsLeft={creditsLeft}
+          usedCredits={usedCredits}
+          maxPlayers={MAX_PLAYERS}
+        />
       )}
 
       {!myTeam && (
-      <>
-      <View style={styles.teamTabs}>
-        {teamNames.map((teamName) => (
-          <Pressable key={teamName} onPress={() => chooseTeam(teamName)} style={[styles.teamTab, selectedTeamName === teamName && styles.activeTeam]}>
-            <Text numberOfLines={1} style={[styles.teamTabText, selectedTeamName === teamName && styles.activeTeamText]}>{teamName}</Text>
-          </Pressable>
-        ))}
-      </View>
-
-      <GlassCard style={styles.roleStats}>
-        {roleStats.map((item) => (
-          <View key={item.label} style={styles.roleStat}>
-            <Text style={styles.roleStatValue}>{item.current} / {item.total}</Text>
-            <Text style={styles.roleStatLabel}>{item.label}</Text>
-            <View style={styles.roleLine} />
+        <>
+          <View style={styles.teamSelectorRow}>
+            <SearchableSelector
+              label="Select Team"
+              value={selectedTeamName}
+              placeholder="Tap to choose a team"
+              options={teamNames}
+              onSelect={(teamName) => chooseTeam(teamName)}
+              disabled={creatingTeam || isContestLocked}
+              emptyText="No teams available for this contest."
+            />
           </View>
-        ))}
-      </GlassCard>
 
-      <View style={styles.roleTabs}>
-        {roles.map((item) => (
-          <Pressable key={item} onPress={() => setRole(item)} style={[styles.roleTab, role === item && styles.activeRole]}>
-            <Text style={[styles.roleText, role === item && styles.activeRoleText]}>{item}</Text>
-          </Pressable>
-        ))}
-      </View>
-      </>
+          <GlassCard style={styles.roleStats}>
+            {roleStats.map((item) => (
+              <View key={item.label} style={styles.roleStat}>
+                <Text style={styles.roleStatValue}>{item.current} / {item.total}</Text>
+                <Text style={styles.roleStatLabel}>{item.label}</Text>
+                <View style={styles.roleLine} />
+              </View>
+            ))}
+          </GlassCard>
+
+          <View style={styles.roleTabs}>
+            {roles.map((item) => (
+              <Pressable
+                key={item}
+                onPress={() => setRole(item)}
+                style={[styles.roleTab, role === item && styles.activeRole]}
+              >
+                <Text style={[styles.roleText, role === item && styles.activeRoleText]}>{item}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </>
       )}
 
       <GlassCard style={styles.playerPanel}>
@@ -302,7 +375,7 @@ const TeamBuilderScreen = ({ navigation, route }) => {
           showsVerticalScrollIndicator={false}
           renderItem={renderPlayer}
           getItemLayout={getPlayerLayout}
-          extraData={selected}
+          extraData={flatListExtraData}
           initialNumToRender={10}
           maxToRenderPerBatch={10}
           removeClippedSubviews
@@ -317,14 +390,23 @@ const TeamBuilderScreen = ({ navigation, route }) => {
       </GlassCard>
 
       {!myTeam && (
-      <View style={styles.footer}>
-        <Button
-          title={selected.length === MAX_PLAYERS ? 'Next' : `Select Players (${selected.length}/${MAX_PLAYERS})`}
-          disabled={selected.length !== MAX_PLAYERS || creatingTeam || loadingContestPlayers || isContestLocked}
-          loading={creatingTeam}
-          onPress={handleSubmit}
-        />
-      </View>
+        <View style={styles.footer}>
+          <Button
+            title={
+              selected.length === MAX_PLAYERS
+                ? 'Next'
+                : `Select Players (${selected.length}/${MAX_PLAYERS})`
+            }
+            disabled={
+              selected.length !== MAX_PLAYERS ||
+              creatingTeam ||
+              loadingContestPlayers ||
+              isContestLocked
+            }
+            loading={creatingTeam}
+            onPress={handleSubmit}
+          />
+        </View>
       )}
     </Screen>
   );
@@ -337,35 +419,9 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     paddingVertical: spacing.md,
   },
-  teamTabs: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  teamSelectorRow: {
     marginHorizontal: spacing.screen,
     marginTop: spacing.md,
-    gap: spacing.sm,
-  },
-  teamTab: {
-    maxWidth: '100%',
-    minHeight: 36,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
-    paddingHorizontal: spacing.md,
-    justifyContent: 'center',
-  },
-  activeTeam: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(85,255,23,0.14)',
-  },
-  teamTabText: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
-    maxWidth: 180,
-  },
-  activeTeamText: {
-    color: colors.primary,
   },
   myTeamCard: {
     marginHorizontal: spacing.screen,
@@ -474,44 +530,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     paddingBottom: spacing.sm,
-  },
-  captainPanel: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.sm,
-    gap: spacing.xs,
-  },
-  captainRow: {
-    minHeight: 34,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-  },
-  captainName: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 12,
-    fontWeight: '800',
-  },
-  captainChip: {
-    minWidth: 34,
-    height: 28,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.borderSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  captainChipActive: {
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(85,255,23,0.14)',
-  },
-  captainChipText: {
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
-  },
-  captainChipTextActive: {
-    color: colors.primary,
   },
   helper: {
     color: colors.textMuted,

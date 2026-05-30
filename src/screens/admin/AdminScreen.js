@@ -8,6 +8,7 @@ import BrandLogo from '../../components/common/BrandLogo';
 import GlassCard from '../../components/common/GlassCard';
 import Header from '../../components/common/Header';
 import Screen from '../../components/common/Screen';
+import SearchableSelector from '../../components/common/SearchableSelector';
 import colors from '../../constants/colors';
 import spacing from '../../constants/spacing';
 import useAppData from '../../hooks/useAppData';
@@ -27,6 +28,7 @@ import {
   importContestResults,
   markContestLive,
   processResults,
+  processTeamResults,
   refundContest,
   rehostContest,
   restartResultProcessing,
@@ -45,6 +47,7 @@ const initialContest = {
   startTime: '',
   estimatedEndTime: '',
   tournamentName: '',
+  contestType: 'fantasy',
 };
 
 const initialPlayer = {
@@ -143,57 +146,21 @@ const GamePicker = ({ value, onChange }) => (
   </View>
 );
 
-const SearchableSelect = ({
-  label,
-  value,
-  placeholder = 'Select',
-  search,
-  onSearch,
-  options,
-  open,
-  onOpenChange,
-  onSelect,
-  multi = false,
-  selectedValues = [],
-  emptyText = 'No items found.',
-}) => (
-  <View style={styles.field}>
-    <Text style={styles.label}>{label}</Text>
-    <Pressable onPress={() => onOpenChange(!open)} style={styles.selectButton}>
-      <Text numberOfLines={1} style={[styles.selectText, !value && styles.selectPlaceholder]}>
-        {value || placeholder}
-      </Text>
-      <Text style={styles.selectChevron}>{open ? 'CLOSE' : 'OPEN'}</Text>
-    </Pressable>
-    {open && (
-      <View style={styles.selectPanel}>
-        <TextInput
-          value={search}
-          onChangeText={onSearch}
-          placeholder="Search"
-          placeholderTextColor={colors.textDim}
-          style={styles.selectSearch}
-        />
-        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} style={styles.selectList}>
-          {options.map((option) => {
-            const selected = multi ? selectedValues.includes(option) : value === option;
-            return (
-              <Pressable
-                key={option}
-                onPress={() => onSelect(option)}
-                style={[styles.teamOption, selected && styles.teamOptionActive]}
-              >
-                <Text numberOfLines={1} style={[styles.teamOptionText, selected && styles.teamOptionTextActive]}>
-                  {option}
-                </Text>
-                {selected && <Text style={styles.teamSelectedMark}>{multi ? 'SELECTED' : 'ACTIVE'}</Text>}
-              </Pressable>
-            );
-          })}
-          {options.length === 0 && <Text style={styles.emptyText}>{emptyText}</Text>}
-        </ScrollView>
-      </View>
-    )}
+const contestTypeOptions = [
+  { value: 'fantasy', label: 'Fantasy Contest' },
+  { value: 'team', label: 'Team Contest' },
+];
+
+const ContestTypePicker = ({ value, onChange }) => (
+  <View style={styles.rolePicker}>
+    {contestTypeOptions.map((item) => {
+      const selected = value === item.value;
+      return (
+        <Pressable key={item.value} onPress={() => onChange(item.value)} style={[styles.roleOption, selected && styles.roleOptionActive]}>
+          <Text style={[styles.roleOptionText, selected && styles.roleOptionTextActive]}>{item.label}</Text>
+        </Pressable>
+      );
+    })}
   </View>
 );
 
@@ -211,20 +178,12 @@ const AdminScreen = ({ navigation }) => {
   const [selectedContestTeamNames, setSelectedContestTeamNames] = useState([]);
   const [contestPlayers, setContestPlayers] = useState([]);
   const [resultRows, setResultRows] = useState({});
-  const [teamSearch, setTeamSearch] = useState('');
-  const [contestTeamOpen, setContestTeamOpen] = useState(false);
-  const [singleTeamOpen, setSingleTeamOpen] = useState(false);
-  const [deleteTeamOpen, setDeleteTeamOpen] = useState(false);
-  const [deletePlayerOpen, setDeletePlayerOpen] = useState(false);
+  const [teamResultRows, setTeamResultRows] = useState({});
   const [teamDeleteGame, setTeamDeleteGame] = useState('BGMI');
-  const [teamDeleteOpen, setTeamDeleteOpen] = useState(false);
-  const [teamDeleteSearch, setTeamDeleteSearch] = useState('');
   const [teamDeleteName, setTeamDeleteName] = useState('');
   const [deleteGame, setDeleteGame] = useState('BGMI');
-  const [deleteTeamSearch, setDeleteTeamSearch] = useState('');
   const [deleteTeamName, setDeleteTeamName] = useState('');
   const [deletePlayerId, setDeletePlayerId] = useState('');
-  const [deletePlayerSearch, setDeletePlayerSearch] = useState('');
   const [leaderboard, setLeaderboard] = useState([]);
   const [saving, setSaving] = useState(false);
   const [picker, setPicker] = useState(null);
@@ -234,6 +193,8 @@ const AdminScreen = ({ navigation }) => {
     () => contests.find((contest) => getId(contest) === selectedContestId),
     [contests, selectedContestId]
   );
+
+  const isTeamContest = selectedContest?.contestType === 'team';
 
   const getTeamNamesForGame = useCallback(
     (game) => [...new Set(players.filter((player) => getGame(player) === game).map((player) => player.team).filter(Boolean))].sort(),
@@ -249,30 +210,6 @@ const AdminScreen = ({ navigation }) => {
   const deleteTeamNames = useMemo(() => getTeamNamesForGame(deleteGame), [deleteGame, getTeamNamesForGame]);
   const teamDeleteNames = useMemo(() => getTeamNamesForGame(teamDeleteGame), [getTeamNamesForGame, teamDeleteGame]);
 
-  const filteredTeamNames = useMemo(() => {
-    const query = teamSearch.trim().toLowerCase();
-    if (!query) return teamNames;
-    return teamNames.filter((teamName) => teamName.toLowerCase().includes(query));
-  }, [teamNames, teamSearch]);
-
-  const filteredSingleTeamNames = useMemo(() => {
-    const query = playerForm.team.trim().toLowerCase();
-    if (!query) return singleTeamNames;
-    return singleTeamNames.filter((teamName) => teamName.toLowerCase().includes(query));
-  }, [playerForm.team, singleTeamNames]);
-
-  const filteredDeleteTeamNames = useMemo(() => {
-    const query = deleteTeamSearch.trim().toLowerCase();
-    if (!query) return deleteTeamNames;
-    return deleteTeamNames.filter((teamName) => teamName.toLowerCase().includes(query));
-  }, [deleteTeamNames, deleteTeamSearch]);
-
-  const filteredTeamDeleteNames = useMemo(() => {
-    const query = teamDeleteSearch.trim().toLowerCase();
-    if (!query) return teamDeleteNames;
-    return teamDeleteNames.filter((teamName) => teamName.toLowerCase().includes(query));
-  }, [teamDeleteNames, teamDeleteSearch]);
-
   const teamDeletePlayerCount = useMemo(
     () => players.filter((player) => getGame(player) === teamDeleteGame && player.team === teamDeleteName).length,
     [players, teamDeleteGame, teamDeleteName]
@@ -282,11 +219,6 @@ const AdminScreen = ({ navigation }) => {
     () => players.filter((player) => getGame(player) === deleteGame && player.team === deleteTeamName),
     [deleteGame, deleteTeamName, players]
   );
-  const filteredDeletePlayers = useMemo(() => {
-    const query = deletePlayerSearch.trim().toLowerCase();
-    if (!query) return deleteTeamPlayers;
-    return deleteTeamPlayers.filter((player) => player.name.toLowerCase().includes(query));
-  }, [deletePlayerSearch, deleteTeamPlayers]);
   const selectedDeletePlayer = useMemo(
     () => deleteTeamPlayers.find((player) => getId(player) === deletePlayerId),
     [deletePlayerId, deleteTeamPlayers]
@@ -351,6 +283,7 @@ const AdminScreen = ({ navigation }) => {
       if (!selectedContestId) {
         setContestPlayers([]);
         setResultRows({});
+        setTeamResultRows({});
         return;
       }
 
@@ -374,12 +307,25 @@ const AdminScreen = ({ navigation }) => {
       }
     };
 
+    // Initialise team result rows from the selected contest's contestTeams
+    const initTeamResultRows = () => {
+      const teams = selectedContest?.contestTeams || [];
+      setTeamResultRows((current) => {
+        const next = {};
+        teams.forEach((teamName) => {
+          next[teamName] = current[teamName] || { position: '', totalKills: '' };
+        });
+        return next;
+      });
+    };
+
     loadContestPlayers();
+    initTeamResultRows();
 
     return () => {
       active = false;
     };
-  }, [selectedContestId]);
+  }, [selectedContestId, selectedContest?.contestTeams]);
 
   const toggleContestTeam = useCallback((teamName) => {
     setSelectedContestTeamNames((current) =>
@@ -406,7 +352,6 @@ const AdminScreen = ({ navigation }) => {
       });
       setContestForm(initialContest);
       setSelectedContestTeamNames([]);
-      setTeamSearch('');
       await refreshContests({ silent: true });
       setSelectedContestId(response.contest?.id || response.contest?._id || '');
       showSuccess('Contest created');
@@ -631,16 +576,10 @@ const AdminScreen = ({ navigation }) => {
               });
 
               setTeamDeleteName('');
-              setTeamDeleteSearch('');
-              setTeamDeleteOpen(false);
 
               if (deleteGame === teamDeleteGame && deleteTeamName === teamDeleteName) {
                 setDeleteTeamName('');
                 setDeletePlayerId('');
-                setDeleteTeamSearch('');
-                setDeletePlayerSearch('');
-                setDeleteTeamOpen(false);
-                setDeletePlayerOpen(false);
               }
 
               await Promise.all([
@@ -722,6 +661,65 @@ const AdminScreen = ({ navigation }) => {
       showSuccess('Match completed and payouts processed');
     } catch (error) {
       showError('Match completion failed', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const completeTeamMatch = async () => {
+    if (!selectedContestId) {
+      Alert.alert('Contest required', 'Select a contest before completing the match.');
+      return;
+    }
+
+    const contestTeams = selectedContest?.contestTeams || [];
+    if (contestTeams.length === 0) {
+      Alert.alert('No teams configured', 'This contest has no participating teams.');
+      return;
+    }
+
+    const teamResults = contestTeams.map((teamName) => {
+      const row = teamResultRows[teamName] || {};
+      return {
+        teamName,
+        position: Number(row.position),
+        totalKills: Number(row.totalKills),
+      };
+    });
+
+    const invalid = teamResults.some(
+      (r) =>
+        !Number.isInteger(r.position) ||
+        r.position < 1 ||
+        !Number.isInteger(r.totalKills) ||
+        r.totalKills < 0 ||
+        (teamResultRows[r.teamName]?.position === '' || teamResultRows[r.teamName]?.totalKills === '')
+    );
+
+    if (invalid) {
+      Alert.alert('Invalid results', 'Enter position (≥ 1) and total kills (≥ 0) for every team.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const response = await processTeamResults({
+        contestId: selectedContestId,
+        teamResults,
+        matchName: selectedContest?.matchName,
+        tournamentName: selectedContest?.tournamentName,
+        matchIdentifier: selectedContest?.matchIdentifier,
+        matchDateTime: selectedContest?.matchDateTime,
+      });
+      const rows = response.leaderboard || await getAdminLeaderboard(selectedContestId);
+      setLeaderboard(rows);
+      await Promise.all([
+        refreshContests({ silent: true }),
+        refreshLeaderboard(selectedContestId, { silent: true }),
+      ]);
+      showSuccess('Team match completed and payouts processed');
+    } catch (error) {
+      showError('Team match completion failed', error);
     } finally {
       setSaving(false);
     }
@@ -936,9 +934,14 @@ const AdminScreen = ({ navigation }) => {
               onChange={(game) => {
                 setContestForm((current) => ({ ...current, game }));
                 setSelectedContestTeamNames([]);
-                setTeamSearch('');
-                setContestTeamOpen(false);
               }}
+            />
+          </View>
+          <View style={styles.field}>
+            <Text style={styles.label}>Contest Type</Text>
+            <ContestTypePicker
+              value={contestForm.contestType}
+              onChange={(contestType) => setContestForm((current) => ({ ...current, contestType }))}
             />
           </View>
           <Field label="Title" value={contestForm.title} onChangeText={(title) => setContestForm((current) => ({ ...current, title }))} />
@@ -950,15 +953,11 @@ const AdminScreen = ({ navigation }) => {
           <DateTimeField label="Start Time" value={contestForm.startTime} onPress={() => openDatePicker('startTime')} />
           <DateTimeField label="Estimated End" value={contestForm.estimatedEndTime} onPress={() => openDatePicker('estimatedEndTime')} />
           <Field label="Tournament" value={contestForm.tournamentName} onChangeText={(tournamentName) => setContestForm((current) => ({ ...current, tournamentName }))} />
-          <SearchableSelect
+          <SearchableSelector
             label="Select Team"
             value={selectedContestTeamNames.length ? `${selectedContestTeamNames.length} team(s) selected` : ''}
             placeholder="Select teams"
-            search={teamSearch}
-            onSearch={setTeamSearch}
-            options={filteredTeamNames}
-            open={contestTeamOpen}
-            onOpenChange={setContestTeamOpen}
+            options={teamNames}
             onSelect={toggleContestTeam}
             multi
             selectedValues={selectedContestTeamNames}
@@ -1021,26 +1020,17 @@ const AdminScreen = ({ navigation }) => {
               value={playerForm.game}
               onChange={(game) => {
                 setPlayerForm((current) => ({ ...current, game, team: '' }));
-                setSingleTeamOpen(false);
               }}
             />
           </View>
           <Field label="Name" value={playerForm.name} onChangeText={(name) => setPlayerForm((current) => ({ ...current, name }))} />
-          <SearchableSelect
+          <SearchableSelector
             label="Team"
             value={playerForm.team}
             placeholder="Select existing team"
-            search={playerForm.team}
-            onSearch={(team) => {
-              setPlayerForm((current) => ({ ...current, team }));
-              setSingleTeamOpen(true);
-            }}
-            options={filteredSingleTeamNames}
-            open={singleTeamOpen}
-            onOpenChange={setSingleTeamOpen}
+            options={singleTeamNames}
             onSelect={(team) => {
               setPlayerForm((current) => ({ ...current, team }));
-              setSingleTeamOpen(false);
             }}
             emptyText="No teams found for this game."
           />
@@ -1063,23 +1053,16 @@ const AdminScreen = ({ navigation }) => {
               onChange={(game) => {
                 setTeamDeleteGame(game);
                 setTeamDeleteName('');
-                setTeamDeleteSearch('');
-                setTeamDeleteOpen(false);
               }}
             />
           </View>
-          <SearchableSelect
+          <SearchableSelector
             label="Select Team"
             value={teamDeleteName}
             placeholder="Select team"
-            search={teamDeleteSearch}
-            onSearch={setTeamDeleteSearch}
-            options={filteredTeamDeleteNames}
-            open={teamDeleteOpen}
-            onOpenChange={setTeamDeleteOpen}
+            options={teamDeleteNames}
             onSelect={(teamName) => {
               setTeamDeleteName(teamName);
-              setTeamDeleteOpen(false);
             }}
             emptyText="No teams found for this game."
           />
@@ -1107,44 +1090,30 @@ const AdminScreen = ({ navigation }) => {
                 setDeleteGame(game);
                 setDeleteTeamName('');
                 setDeletePlayerId('');
-                setDeleteTeamSearch('');
-                setDeletePlayerSearch('');
-                setDeleteTeamOpen(false);
-                setDeletePlayerOpen(false);
               }}
             />
           </View>
-          <SearchableSelect
+          <SearchableSelector
             label="Select Team"
             value={deleteTeamName}
             placeholder="Select team"
-            search={deleteTeamSearch}
-            onSearch={setDeleteTeamSearch}
-            options={filteredDeleteTeamNames}
-            open={deleteTeamOpen}
-            onOpenChange={setDeleteTeamOpen}
+            options={deleteTeamNames}
             onSelect={(teamName) => {
               setDeleteTeamName(teamName);
               setDeletePlayerId('');
-              setDeletePlayerSearch('');
-              setDeleteTeamOpen(false);
             }}
             emptyText="No teams found for this game."
           />
-          <SearchableSelect
+          <SearchableSelector
             label="Select Player"
             value={selectedDeletePlayer?.name || ''}
             placeholder={deleteTeamName ? 'Select player' : 'Select a team first'}
-            search={deletePlayerSearch}
-            onSearch={setDeletePlayerSearch}
-            options={filteredDeletePlayers.map((player) => player.name)}
-            open={deletePlayerOpen}
-            onOpenChange={(open) => deleteTeamName && setDeletePlayerOpen(open)}
+            options={deleteTeamPlayers.map((player) => player.name)}
             onSelect={(playerName) => {
-              const player = filteredDeletePlayers.find((item) => item.name === playerName);
+              const player = deleteTeamPlayers.find((item) => item.name === playerName);
               setDeletePlayerId(player ? getId(player) : '');
-              setDeletePlayerOpen(false);
             }}
+            disabled={!deleteTeamName}
             emptyText={deleteTeamName ? 'No players in selected team.' : 'Select a team first.'}
           />
           <Button title="Delete Player" variant="purple" loading={saving} disabled={saving || !deletePlayerId} onPress={confirmDeletePlayer} />
@@ -1167,7 +1136,7 @@ const AdminScreen = ({ navigation }) => {
             })}
           </View>
           <Text style={styles.statusLine}>
-            {(selectedContest?.status || 'upcoming').toUpperCase()} | {contestPlayers.length} active players
+            {(selectedContest?.status || 'upcoming').toUpperCase()} | {isTeamContest ? `${(selectedContest?.contestTeams || []).length} teams` : `${contestPlayers.length} active players`} | {isTeamContest ? 'Team Contest' : 'Fantasy Contest'}
           </Text>
           <View style={styles.controlGrid}>
             <Pressable style={styles.controlButton} onPress={() => runAdminControl('live', 'Match marked live')}>
@@ -1201,42 +1170,111 @@ const AdminScreen = ({ navigation }) => {
               <Text style={styles.accountingText}>Created: {importSummary.created ?? 0}</Text>
             </View>
           )}
-          {contestPlayers.length === 0 ? (
-            <Text style={styles.emptyText}>Select a contest with configured players.</Text>
-          ) : (
-            contestPlayers.map((player) => {
-              const playerId = getId(player);
-              const row = resultRows[playerId] || {};
-              const points = calculateFantasyPoints(row.kills, row.placement);
+          {isTeamContest ? (
+            <>
+              <Text style={styles.statusLine}>
+                Team Contest — enter position and total kills for each team
+              </Text>
+              {(selectedContest?.contestTeams || []).map((teamName) => {
+                const row = teamResultRows[teamName] || {};
+                const pos = row.position || '';
+                const kills = row.totalKills || '';
+                const posNum = Number(pos);
+                const killsNum = Number(kills);
+                const placementPts = { 1: 20, 2: 14, 3: 10, 4: 8, 5: 6, 6: 4, 7: 2 };
+                const displayPoints =
+                  pos !== '' && kills !== ''
+                    ? killsNum * 4 + (placementPts[posNum] || 0)
+                    : null;
 
-              return (
-                <View key={playerId} style={styles.resultRow}>
-                  <View style={styles.resultPlayer}>
-                    <Text numberOfLines={1} style={styles.resultName}>{player.name}</Text>
-                    <Text numberOfLines={1} style={styles.resultTeam}>{player.team}</Text>
+                return (
+                  <View key={teamName} style={styles.resultRow}>
+                    <View style={styles.resultPlayer}>
+                      <Text numberOfLines={1} style={styles.resultName}>{teamName}</Text>
+                      <Text numberOfLines={1} style={styles.resultTeam}>Participating Team</Text>
+                    </View>
+                    <TextInput
+                      value={pos}
+                      onChangeText={(value) =>
+                        setTeamResultRows((current) => ({
+                          ...current,
+                          [teamName]: { ...(current[teamName] || {}), position: value },
+                        }))
+                      }
+                      keyboardType="number-pad"
+                      placeholder="#"
+                      placeholderTextColor={colors.textDim}
+                      style={styles.smallInput}
+                    />
+                    <TextInput
+                      value={kills}
+                      onChangeText={(value) =>
+                        setTeamResultRows((current) => ({
+                          ...current,
+                          [teamName]: { ...(current[teamName] || {}), totalKills: value },
+                        }))
+                      }
+                      keyboardType="number-pad"
+                      placeholder="K"
+                      placeholderTextColor={colors.textDim}
+                      style={styles.smallInput}
+                    />
+                    <Text style={styles.resultPoints}>
+                      {displayPoints !== null ? displayPoints : '—'}
+                    </Text>
                   </View>
-                  <TextInput
-                    value={row.kills}
-                    onChangeText={(kills) => updateResultRow(playerId, { kills })}
-                    keyboardType="number-pad"
-                    placeholder="K"
-                    placeholderTextColor={colors.textDim}
-                    style={styles.smallInput}
-                  />
-                  <TextInput
-                    value={row.placement}
-                    onChangeText={(placement) => updateResultPlacement(player, placement)}
-                    keyboardType="number-pad"
-                    placeholder="#"
-                    placeholderTextColor={colors.textDim}
-                    style={styles.smallInput}
-                  />
-                  <Text style={styles.resultPoints}>{points}</Text>
-                </View>
-              );
-            })
+                );
+              })}
+              {(selectedContest?.contestTeams || []).length === 0 && (
+                <Text style={styles.emptyText}>No teams configured for this contest.</Text>
+              )}
+              <Button
+                title="Complete Team Match"
+                loading={saving}
+                disabled={saving || (selectedContest?.contestTeams || []).length === 0 || selectedContest?.status === 'completed'}
+                onPress={completeTeamMatch}
+              />
+            </>
+          ) : (
+            <>
+              {contestPlayers.length === 0 ? (
+                <Text style={styles.emptyText}>Select a contest with configured players.</Text>
+              ) : (
+                contestPlayers.map((player) => {
+                  const playerId = getId(player);
+                  const row = resultRows[playerId] || {};
+                  const points = calculateFantasyPoints(row.kills, row.placement);
+
+                  return (
+                    <View key={playerId} style={styles.resultRow}>
+                      <View style={styles.resultPlayer}>
+                        <Text numberOfLines={1} style={styles.resultName}>{player.name}</Text>
+                        <Text numberOfLines={1} style={styles.resultTeam}>{player.team}</Text>
+                      </View>
+                      <TextInput
+                        value={row.kills}
+                        onChangeText={(kills) => updateResultRow(playerId, { kills })}
+                        keyboardType="number-pad"
+                        placeholder="K"
+                        placeholderTextColor={colors.textDim}
+                        style={styles.smallInput}
+                      />
+                      <TextInput
+                        value={row.placement}
+                        onChangeText={(placement) => updateResultPlacement(player, placement)}
+                        keyboardType="number-pad"
+                        placeholder="#"
+                        placeholderTextColor={colors.textDim}
+                        style={styles.smallInput}
+                      />
+                      <Text style={styles.resultPoints}>{points}</Text>
+                    </View>
+                  );
+                })
+              )}
+              <Button title="Complete Match" loading={saving} disabled={saving || contestPlayers.length === 0 || selectedContest?.status === 'completed'} onPress={completeMatch} />
+            </>
           )}
-          <Button title="Complete Match" loading={saving} disabled={saving || contestPlayers.length === 0 || selectedContest?.status === 'completed'} onPress={completeMatch} />
           {leaderboard.slice(0, 5).map((row) => (
             <View key={`${row.rank}-${row.teamId}`} style={styles.leaderRow}>
               <Text style={styles.leaderText}>{row.rank}. {row.team}</Text>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Button from '../../components/common/Button';
 import GlassCard from '../../components/common/GlassCard';
@@ -20,35 +20,45 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
     selectedTeamName = '',
     totalCredits = 0,
   } = route.params || {};
+
   const { createTeam, creatingTeam, setActiveContestId } = useAppData();
   const [captain, setCaptain] = useState('');
   const [viceCaptain, setViceCaptain] = useState('');
 
+  // Guard: only validate params once on mount, not on every re-render.
+  // Using a ref prevents the navigation.goBack() from firing again if the
+  // navigation object reference changes between renders.
+  const validatedRef = useRef(false);
   const playerIds = useMemo(
     () => [...new Set(selectedPlayerIds.map(String))],
     [selectedPlayerIds]
   );
-  const hasValidSelection = playerIds.length === MAX_PLAYERS && selectedPlayers.length === MAX_PLAYERS;
+  const hasValidSelection =
+    playerIds.length === MAX_PLAYERS && selectedPlayers.length === MAX_PLAYERS;
 
   useEffect(() => {
+    if (validatedRef.current) return;
+    validatedRef.current = true;
+
     if (!contestId || !hasValidSelection) {
-      Alert.alert('Complete team first', `Select exactly ${MAX_PLAYERS} players before choosing captain and vice-captain.`, [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      Alert.alert(
+        'Complete team first',
+        `Select exactly ${MAX_PLAYERS} players before choosing captain and vice-captain.`,
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
     }
-  }, [contestId, hasValidSelection, navigation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — run once on mount only
 
   const confirmTeam = async () => {
     if (!contestId || !hasValidSelection) {
       Alert.alert('Complete team first', `Select exactly ${MAX_PLAYERS} players before confirming.`);
       return;
     }
-
     if (!captain || !viceCaptain) {
       Alert.alert('Captain required', 'Select both captain and vice-captain.');
       return;
     }
-
     if (captain === viceCaptain) {
       Alert.alert('Choose different players', 'Captain and vice-captain must be different players.');
       return;
@@ -81,9 +91,12 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
   return (
     <Screen>
       <Header title="Captain & Vice-Captain" onBack={() => navigation.goBack()} />
+
       <GlassCard style={styles.summary}>
         <Text style={styles.title}>{contest?.title || 'Contest Team'}</Text>
-        <Text style={styles.meta}>{selectedTeamName || 'Selected Players'} | {Number(totalCredits || 0).toFixed(1)} credits</Text>
+        <Text style={styles.meta}>
+          {selectedTeamName || 'Selected Players'} | {Number(totalCredits || 0).toFixed(1)} credits
+        </Text>
       </GlassCard>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -96,8 +109,11 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
             <GlassCard key={playerId} style={styles.playerRow}>
               <View style={styles.playerMain}>
                 <Text numberOfLines={1} style={styles.playerName}>{player.name}</Text>
-                <Text numberOfLines={1} style={styles.playerMeta}>{player.team} | {player.role}</Text>
+                <Text numberOfLines={1} style={styles.playerMeta}>
+                  {player.team} | {player.role}
+                </Text>
               </View>
+
               <Pressable
                 onPress={() => {
                   setCaptain(playerId);
@@ -107,6 +123,7 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
               >
                 <Text style={[styles.pickText, isCaptain && styles.pickTextActive]}>C</Text>
               </Pressable>
+
               <Pressable
                 onPress={() => {
                   setViceCaptain(playerId);
@@ -126,7 +143,13 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
         <Button
           title="Confirm Team"
           loading={creatingTeam}
-          disabled={creatingTeam || !hasValidSelection || !captain || !viceCaptain || captain === viceCaptain}
+          disabled={
+            creatingTeam ||
+            !hasValidSelection ||
+            !captain ||
+            !viceCaptain ||
+            captain === viceCaptain
+          }
           onPress={confirmTeam}
         />
       </View>
