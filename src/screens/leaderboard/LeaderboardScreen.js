@@ -9,11 +9,13 @@ import Header from '../../components/common/Header';
 import Loader from '../../components/common/Loader';
 import Screen from '../../components/common/Screen';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import { showError } from '../../utils/feedback';
 
-const ROW_HEIGHT = 52;
+const ROW_HEIGHT = 54;
 
 const formatWinnings = (amount) => {
   const value = Number(amount || 0);
@@ -76,9 +78,9 @@ const LeaderboardScreen = ({ navigation, route }) => {
   const renderItem = useCallback(({ item, index }) => (
     <AnimatedView delay={index * 50}>
       <View style={[styles.row, item.mine && styles.myRow]}>
-        <Text style={styles.rankText}>{item.rank}</Text>
+        <Text style={styles.rankText}>#{item.rank}</Text>
         <View style={styles.teamCell}>
-          <GameAvatar name={item.team} size={30} />
+          <GameAvatar name={item.team} size={32} />
           <Text numberOfLines={1} style={[styles.teamName, item.mine && styles.mineText]}>{item.team}</Text>
         </View>
         <Text style={styles.points}>{Number(item.points || 0).toFixed(1)}</Text>
@@ -126,8 +128,8 @@ const LeaderboardScreen = ({ navigation, route }) => {
                 <View style={[styles.rankBadge, index === 0 && styles.winnerBadge]}>
                   <Text style={styles.rankBadgeText}>#{item.rank}</Text>
                 </View>
-                <Ionicons name="trophy" size={24} color={index === 0 ? colors.coin : colors.textMuted} />
-                <GameAvatar name={item.team} size={54} />
+                <Ionicons name="trophy" size={22} color={index === 0 ? colors.coin : colors.textMuted} />
+                <GameAvatar name={item.team} size={50} />
                 <Text numberOfLines={1} style={styles.podiumName}>{item.team}</Text>
                 <Text style={styles.podiumPoints}>{Number(item.points || 0).toFixed(1)}</Text>
                 <Text style={styles.podiumWinnings}>{formatWinnings(item.winnings)} coins</Text>
@@ -165,27 +167,27 @@ const styles = StyleSheet.create({
   segment: {
     flexDirection: 'row',
     alignSelf: 'center',
-    width: 210,
+    width: 200,
     padding: 3,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
     marginTop: spacing.sm,
   },
   segmentItem: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: spacing.sm,
-    borderRadius: 16,
+    borderRadius: radius.pill,
   },
   segmentActive: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.primary,
   },
   segmentText: {
     color: colors.textMuted,
-    fontWeight: '900',
+    ...typography.caption,
   },
   segmentTextActive: {
-    color: colors.white,
+    color: colors.textInverse,
   },
   content: {
     paddingHorizontal: spacing.screen,
@@ -202,21 +204,19 @@ const styles = StyleSheet.create({
   contestTitle: {
     flex: 1,
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
+    ...typography.title,
   },
   statusBadge: {
     overflow: 'hidden',
-    borderRadius: 10,
-    backgroundColor: '#0752b8',
+    borderRadius: radius.pill,
+    backgroundColor: colors.accentDark,
     color: colors.white,
-    fontSize: 10,
-    fontWeight: '900',
+    ...typography.micro,
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
   },
   liveBadge: {
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.live,
   },
   completedBadge: {
     backgroundColor: colors.textMuted,
@@ -229,49 +229,46 @@ const styles = StyleSheet.create({
   },
   podiumCard: {
     flex: 1,
-    minHeight: 132,
+    minHeight: 130,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.sm,
     position: 'relative',
   },
   winnerCard: {
-    minHeight: 152,
+    minHeight: 150,
   },
   rankBadge: {
     position: 'absolute',
     top: spacing.sm,
     right: spacing.sm,
-    borderRadius: 8,
+    borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: colors.surfaceMuted,
   },
   winnerBadge: {
     backgroundColor: colors.coinSoft,
   },
   rankBadgeText: {
     color: colors.coin,
-    fontSize: 10,
-    fontWeight: '900',
+    ...typography.micro,
   },
   podiumName: {
     color: colors.text,
-    fontSize: 12,
-    fontWeight: '900',
+    ...typography.caption,
     textAlign: 'center',
     marginTop: spacing.xs,
     maxWidth: '100%',
   },
   podiumPoints: {
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.subtitle,
+    marginTop: 2,
   },
   podiumWinnings: {
     color: colors.coin,
-    fontSize: 11,
-    fontWeight: '900',
+    ...typography.micro,
     marginTop: 2,
   },
   tableHead: {
@@ -283,37 +280,36 @@ const styles = StyleSheet.create({
   rankHead: {
     width: 50,
     color: colors.textMuted,
-    fontWeight: '800',
+    ...typography.caption,
   },
   teamHead: {
     flex: 1,
     color: colors.textMuted,
-    fontWeight: '800',
+    ...typography.caption,
   },
   pointsHead: {
     width: 72,
     color: colors.textMuted,
     textAlign: 'right',
-    fontWeight: '800',
+    ...typography.caption,
   },
   winHead: {
     width: 56,
     color: colors.textMuted,
     textAlign: 'right',
-    fontWeight: '800',
+    ...typography.caption,
   },
   table: {
     overflow: 'hidden',
   },
   emptyText: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '800',
+    ...typography.bodySmall,
     textAlign: 'center',
     padding: spacing.lg,
   },
   row: {
-    minHeight: 52,
+    minHeight: ROW_HEIGHT,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
@@ -321,26 +317,24 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSoft,
   },
   myRow: {
-    backgroundColor: 'rgba(85, 255, 23, 0.12)',
-    borderColor: colors.primary,
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.border,
   },
   rankText: {
     width: 50,
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
+    ...typography.body,
   },
   teamCell: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   teamName: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
   mineText: {
     color: colors.primary,
@@ -349,15 +343,13 @@ const styles = StyleSheet.create({
     width: 72,
     textAlign: 'right',
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
   winnings: {
     width: 56,
     textAlign: 'right',
     color: colors.coin,
-    fontSize: 12,
-    fontWeight: '900',
+    ...typography.caption,
   },
 });
 

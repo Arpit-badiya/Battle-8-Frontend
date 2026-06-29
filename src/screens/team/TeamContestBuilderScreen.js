@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -6,16 +7,17 @@ import GlassCard from '../../components/common/GlassCard';
 import Header from '../../components/common/Header';
 import Screen from '../../components/common/Screen';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import { getMyTeam } from '../../services/contestService';
 import { showError } from '../../utils/feedback';
 
 const REQUIRED_TEAMS = 8;
-const CAPTAIN_MULTIPLIER = '2×';
-const VICE_CAPTAIN_MULTIPLIER = '1.5×';
+const CAPTAIN_MULTIPLIER = '2x';
+const VICE_CAPTAIN_MULTIPLIER = '1.5x';
 
-// Step identifiers
 const STEP_SELECT = 'select';
 const STEP_CAPTAIN = 'captain';
 const STEP_CONFIRM = 'confirm';
@@ -74,7 +76,6 @@ const TeamContestBuilderScreen = ({ navigation, route }) => {
 
     setSelectedTeams((current) => {
       if (current.includes(teamName)) {
-        // Deselecting — clear captain/vc if they were this team
         if (captainTeam === teamName) setCaptainTeam('');
         if (viceCaptainTeam === teamName) setViceCaptainTeam('');
         return current.filter((t) => t !== teamName);
@@ -177,16 +178,15 @@ const TeamContestBuilderScreen = ({ navigation, route }) => {
       ? 'Captain & Vice-Captain'
       : 'Confirm Entry';
 
-  // ── Existing entry view ──────────────────────────────────────────────────
   if (myEntry && !loadingEntry) {
     return (
       <Screen>
         <Header title="My Entry" onBack={() => navigation.goBack()} />
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <GlassCard style={styles.summaryCard}>
+          <GlassCard style={styles.summaryCard} glow>
             <Text style={styles.summaryTitle}>{contest?.title || 'Team Contest'}</Text>
             <Text style={styles.summaryMeta}>
-              Rank #{myEntry.rank || '—'} · {myEntry.points || 0} pts
+              Rank #{myEntry.rank || '-'} | {myEntry.points || 0} pts
             </Text>
           </GlassCard>
 
@@ -217,12 +217,11 @@ const TeamContestBuilderScreen = ({ navigation, route }) => {
     );
   }
 
-  // ── Step: Select 8 teams ─────────────────────────────────────────────────
   if (step === STEP_SELECT) {
     return (
       <Screen>
         <Header title={stepTitle} onBack={handleBack} />
-        <GlassCard style={styles.summaryCard}>
+        <GlassCard style={styles.summaryCard} glow>
           <Text style={styles.summaryTitle}>{contest?.title || 'Team Contest'}</Text>
           <Text style={styles.summaryMeta}>
             Select exactly {REQUIRED_TEAMS} teams from the {contestTeams.length} participating teams
@@ -247,7 +246,7 @@ const TeamContestBuilderScreen = ({ navigation, route }) => {
                   </Text>
                   {selected && (
                     <View style={styles.checkMark}>
-                      <Text style={styles.checkMarkText}>✓</Text>
+                      <Ionicons name="checkmark" size={16} color={colors.textInverse} />
                     </View>
                   )}
                 </Pressable>
@@ -272,15 +271,14 @@ const TeamContestBuilderScreen = ({ navigation, route }) => {
     );
   }
 
-  // ── Step: Captain & Vice-Captain ─────────────────────────────────────────
   if (step === STEP_CAPTAIN) {
     return (
       <Screen>
         <Header title={stepTitle} onBack={handleBack} />
-        <GlassCard style={styles.summaryCard}>
+        <GlassCard style={styles.summaryCard} glow>
           <Text style={styles.summaryTitle}>Pick Captain & Vice-Captain</Text>
           <Text style={styles.summaryMeta}>
-            Captain team gets {CAPTAIN_MULTIPLIER} · Vice-captain gets {VICE_CAPTAIN_MULTIPLIER} on aggregate score
+            Captain team gets {CAPTAIN_MULTIPLIER} | Vice-captain gets {VICE_CAPTAIN_MULTIPLIER} on aggregate score
           </Text>
         </GlassCard>
 
@@ -292,28 +290,30 @@ const TeamContestBuilderScreen = ({ navigation, route }) => {
             return (
               <GlassCard key={teamName} style={styles.captainRow}>
                 <Text style={styles.captainTeamName}>{teamName}</Text>
-                <Pressable
-                  onPress={() => {
-                    setCaptainTeam(teamName);
-                    if (viceCaptainTeam === teamName) setViceCaptainTeam('');
-                  }}
-                  style={[styles.pickButton, isCaptain && styles.pickButtonActive]}
-                >
-                  <Text style={[styles.pickText, isCaptain && styles.pickTextActive]}>
-                    C {CAPTAIN_MULTIPLIER}
-                  </Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => {
-                    setViceCaptainTeam(teamName);
-                    if (captainTeam === teamName) setCaptainTeam('');
-                  }}
-                  style={[styles.pickButton, isViceCaptain && styles.pickButtonActive]}
-                >
-                  <Text style={[styles.pickText, isViceCaptain && styles.pickTextActive]}>
-                    VC {VICE_CAPTAIN_MULTIPLIER}
-                  </Text>
-                </Pressable>
+                <View style={styles.picks}>
+                  <Pressable
+                    onPress={() => {
+                      setCaptainTeam(teamName);
+                      if (viceCaptainTeam === teamName) setViceCaptainTeam('');
+                    }}
+                    style={[styles.pickButton, isCaptain && styles.pickButtonActiveCaptain]}
+                  >
+                    <Text style={[styles.pickText, isCaptain && styles.pickTextActive]}>
+                      C {CAPTAIN_MULTIPLIER}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => {
+                      setViceCaptainTeam(teamName);
+                      if (captainTeam === teamName) setCaptainTeam('');
+                    }}
+                    style={[styles.pickButton, isViceCaptain && styles.pickButtonActiveVc]}
+                  >
+                    <Text style={[styles.pickText, isViceCaptain && styles.pickTextActive]}>
+                      VC {VICE_CAPTAIN_MULTIPLIER}
+                    </Text>
+                  </Pressable>
+                </View>
               </GlassCard>
             );
           })}
@@ -331,12 +331,11 @@ const TeamContestBuilderScreen = ({ navigation, route }) => {
     );
   }
 
-  // ── Step: Confirm ────────────────────────────────────────────────────────
   return (
     <Screen>
       <Header title={stepTitle} onBack={handleBack} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <GlassCard style={styles.summaryCard}>
+        <GlassCard style={styles.summaryCard} glow>
           <Text style={styles.summaryTitle}>{contest?.title || 'Team Contest'}</Text>
           <Text style={styles.summaryMeta}>
             Entry Fee: {contest?.entryFee || 0} coins · {REQUIRED_TEAMS} teams selected
@@ -369,16 +368,16 @@ const TeamContestBuilderScreen = ({ navigation, route }) => {
         <GlassCard style={styles.rulesCard}>
           <Text style={styles.rulesTitle}>Scoring Rules</Text>
           <Text style={styles.rulesText}>
-            · Each team earns points based on their players' kills and placement
+            - Each team earns points based on their players' kills and placement
           </Text>
           <Text style={styles.rulesText}>
-            · Captain team score is multiplied by {CAPTAIN_MULTIPLIER}
+            - Captain team score is multiplied by {CAPTAIN_MULTIPLIER}
           </Text>
           <Text style={styles.rulesText}>
-            · Vice-captain team score is multiplied by {VICE_CAPTAIN_MULTIPLIER}
+            - Vice-captain team score is multiplied by {VICE_CAPTAIN_MULTIPLIER}
           </Text>
           <Text style={styles.rulesText}>
-            · All other selected teams count at 1×
+            - All other selected teams count at 1x
           </Text>
         </GlassCard>
 
@@ -411,13 +410,11 @@ const styles = StyleSheet.create({
   },
   summaryTitle: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '900',
+    ...typography.title,
   },
   summaryMeta: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
+    ...typography.caption,
   },
   panel: {
     padding: spacing.lg,
@@ -425,13 +422,12 @@ const styles = StyleSheet.create({
   },
   panelTitle: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
+    ...typography.subtitle,
     marginBottom: spacing.xs,
   },
   teamCard: {
     minHeight: 54,
-    borderRadius: 12,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -439,16 +435,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
+    marginBottom: spacing.sm,
   },
   teamCardActive: {
     borderColor: colors.primary,
-    backgroundColor: 'rgba(85,255,23,0.10)',
+    backgroundColor: colors.primarySoft,
   },
   teamCardName: {
     flex: 1,
     color: colors.textMuted,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
   teamCardNameActive: {
     color: colors.primary,
@@ -461,28 +457,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkMarkText: {
-    color: colors.black,
-    fontSize: 13,
-    fontWeight: '900',
-  },
   captainRow: {
-    minHeight: 62,
+    minHeight: 66,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.md,
+    marginBottom: spacing.sm,
   },
   captainTeamName: {
     flex: 1,
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.bodySmall,
+  },
+  picks: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   pickButton: {
     minWidth: 58,
-    height: 36,
-    borderRadius: 9,
+    height: 38,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     alignItems: 'center',
@@ -490,17 +485,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     paddingHorizontal: spacing.sm,
   },
-  pickButtonActive: {
+  pickButtonActiveCaptain: {
     borderColor: colors.primary,
-    backgroundColor: 'rgba(85,255,23,0.14)',
+    backgroundColor: colors.primary,
+  },
+  pickButtonActiveVc: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   pickText: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
+    ...typography.micro,
   },
   pickTextActive: {
-    color: colors.primary,
+    color: colors.textInverse,
   },
   teamRow: {
     minHeight: 44,
@@ -513,30 +511,28 @@ const styles = StyleSheet.create({
   teamRowName: {
     flex: 1,
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
   badge: {
-    borderRadius: 8,
+    borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     alignItems: 'center',
     justifyContent: 'center',
   },
   captainBadge: {
-    backgroundColor: 'rgba(255,191,24,0.18)',
+    backgroundColor: colors.primarySoft,
     borderWidth: 1,
     borderColor: colors.coin,
   },
   vcBadge: {
-    backgroundColor: 'rgba(85,255,23,0.14)',
+    backgroundColor: colors.accentSoft,
     borderWidth: 1,
-    borderColor: colors.primary,
+    borderColor: colors.accent,
   },
   badgeText: {
     color: colors.text,
-    fontSize: 10,
-    fontWeight: '900',
+    ...typography.micro,
   },
   rulesCard: {
     padding: spacing.lg,
@@ -544,20 +540,17 @@ const styles = StyleSheet.create({
   },
   rulesTitle: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.subtitle,
     marginBottom: spacing.xs,
   },
   rulesText: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    ...typography.caption,
     lineHeight: 18,
   },
   emptyText: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '800',
+    ...typography.bodySmall,
     textAlign: 'center',
     paddingVertical: spacing.xl,
   },

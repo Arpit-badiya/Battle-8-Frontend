@@ -9,7 +9,9 @@ import Header from '../../components/common/Header';
 import Loader from '../../components/common/Loader';
 import Screen from '../../components/common/Screen';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import { getAdSummary, recordAdReward } from '../../services/adRewardService';
 import { showRewardedAd } from '../../services/adMobService';
@@ -138,25 +140,25 @@ const EarnCoinsScreen = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   content: { padding: spacing.screen, paddingBottom: 110, gap: spacing.md },
-  hero: { minHeight: 132, padding: spacing.lg, justifyContent: 'space-between' },
-  eyebrow: { color: colors.coin, fontSize: 12, fontWeight: '900' },
-  title: { color: colors.text, fontSize: 24, fontWeight: '900', marginTop: spacing.xs },
-  sub: { color: colors.textMuted, fontSize: 13, fontWeight: '700', marginTop: spacing.sm },
+  hero: { minHeight: 132, padding: spacing.lg, justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center' },
+  eyebrow: { color: colors.coin, ...typography.caption, textTransform: 'uppercase' },
+  title: { color: colors.text, ...typography.h2, marginTop: spacing.xs },
+  sub: { color: colors.textMuted, ...typography.caption, marginTop: spacing.sm },
   rewardPopup: { minHeight: 56, padding: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  rewardText: { color: colors.text, fontSize: 15, fontWeight: '900' },
+  rewardText: { color: colors.text, ...typography.body },
   panel: { padding: spacing.lg, gap: spacing.md },
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  panelTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
-  panelValue: { color: colors.coin, fontSize: 16, fontWeight: '900' },
-  track: { height: 10, borderRadius: 10, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
-  fill: { height: '100%', borderRadius: 10, backgroundColor: colors.primary },
-  meta: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
-  historyTitle: { color: colors.text, fontSize: 16, fontWeight: '900', marginTop: spacing.sm },
+  panelTitle: { color: colors.text, ...typography.subtitle },
+  panelValue: { color: colors.coin, ...typography.subtitle },
+  track: { height: 8, borderRadius: radius.pill, backgroundColor: 'rgba(255,255,255,0.08)', overflow: 'hidden' },
+  fill: { height: '100%', borderRadius: radius.pill, backgroundColor: colors.primary },
+  meta: { color: colors.textMuted, ...typography.micro },
+  historyTitle: { color: colors.text, ...typography.h3, marginTop: spacing.sm },
   history: { paddingVertical: spacing.sm },
   historyRow: { minHeight: 42, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  historyText: { color: colors.text, fontWeight: '800' },
-  historyCoins: { color: colors.primary, fontWeight: '900' },
-  empty: { color: colors.textMuted, padding: spacing.lg, textAlign: 'center' },
+  historyText: { color: colors.text, ...typography.bodySmall },
+  historyCoins: { color: colors.primary, ...typography.bodySmall },
+  empty: { color: colors.textMuted, ...typography.bodySmall, padding: spacing.lg, textAlign: 'center' },
 });
 
 export default EarnCoinsScreen;

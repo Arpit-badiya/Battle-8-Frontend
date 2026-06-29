@@ -2,65 +2,82 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
+import shadows from '../../constants/shadows';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 
-const Button = ({ title, onPress, disabled, loading, icon, variant = 'primary', style }) => {
+const variants = {
+  primary: {
+    gradient: [colors.primary, colors.primaryDark],
+    borderColor: colors.primary,
+    textColor: colors.textInverse,
+    glow: colors.primaryGlow,
+  },
+  secondary: {
+    gradient: [colors.surfaceElevated, colors.surfaceMuted],
+    borderColor: colors.borderSoft,
+    textColor: colors.text,
+    glow: 'transparent',
+  },
+  ghost: {
+    gradient: ['rgba(255,255,255,0.03)', 'rgba(255,255,255,0.03)'],
+    borderColor: colors.borderSoft,
+    textColor: colors.text,
+    glow: 'transparent',
+  },
+  outline: {
+    gradient: ['transparent', 'transparent'],
+    borderColor: colors.primary,
+    textColor: colors.primary,
+    glow: 'transparent',
+  },
+  purple: {
+    gradient: [colors.purple, colors.purpleDark],
+    borderColor: colors.purple,
+    textColor: colors.white,
+    glow: 'rgba(124,92,255,0.38)',
+  },
+};
+
+const Button = ({ title, onPress, disabled, loading, icon, variant = 'primary', fullWidth = true, size = 'md', style }) => {
   const scale = useRef(new Animated.Value(1)).current;
-  const pulse = useRef(new Animated.Value(0)).current;
+  const current = variants[variant] || variants.primary;
 
   useEffect(() => {
     Animated.spring(scale, {
-      toValue: disabled ? 0.99 : 1,
+      toValue: disabled ? 0.98 : 1,
       useNativeDriver: true,
     }).start();
   }, [disabled, scale]);
 
-  useEffect(() => {
-    if (disabled || variant !== 'primary') {
-      return undefined;
-    }
-
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1, duration: 1200, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 0, duration: 1200, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-
-    return () => loop.stop();
-  }, [disabled, pulse, variant]);
-
-  const gradient =
-    variant === 'purple'
-      ? [colors.purple, '#4d1cb8']
-      : disabled
-        ? ['#20262c', '#11161b']
-        : [colors.primary, colors.primaryDark];
+  const gradient = disabled ? [colors.surfaceMuted, colors.surfaceMuted] : current.gradient;
+  const isOutline = variant === 'outline';
 
   return (
-    <Animated.View style={[{ transform: [{ scale }] }, style]}>
-      {!disabled && variant === 'primary' && (
-        <Animated.View
-          style={[
-            styles.pulse,
-            {
-              opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.65] }),
-              transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.96, 1.04] }) }],
-            },
-          ]}
-        />
-      )}
+    <Animated.View style={[{ transform: [{ scale }] }, fullWidth && styles.fullWidth, style]}>
       <Pressable
         onPress={onPress}
         disabled={disabled || loading}
-        onPressIn={() => Animated.spring(scale, { toValue: 0.96, useNativeDriver: true }).start()}
+        onPressIn={() => Animated.spring(scale, { toValue: 0.97, useNativeDriver: true }).start()}
         onPressOut={() => Animated.spring(scale, { toValue: 1, friction: 5, useNativeDriver: true }).start()}
       >
-        <LinearGradient colors={gradient} style={styles.button}>
-          <View style={styles.innerGlow} />
-          {loading ? <ActivityIndicator color={colors.white} /> : icon}
-          {!loading && <Text style={[styles.title, disabled && styles.disabledTitle]}>{title}</Text>}
+        <LinearGradient
+          colors={gradient}
+          style={[
+            styles.button,
+            styles[size],
+            isOutline && styles.outlineButton,
+            disabled && styles.buttonDisabled,
+            { borderColor: current.borderColor },
+          ]}
+        >
+          {loading ? <ActivityIndicator color={current.textColor} /> : icon}
+          {!loading && (
+            <Text style={[styles.title, { color: current.textColor }, disabled && styles.disabledTitle]}>
+              {title}
+            </Text>
+          )}
         </LinearGradient>
       </Pressable>
     </Animated.View>
@@ -68,47 +85,39 @@ const Button = ({ title, onPress, disabled, loading, icon, variant = 'primary', 
 };
 
 const styles = StyleSheet.create({
+  fullWidth: {
+    width: '100%',
+  },
   button: {
-    minHeight: 50,
-    borderRadius: 10,
+    borderRadius: radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
     gap: spacing.sm,
     paddingHorizontal: spacing.xl,
     borderWidth: 1,
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.42,
-    shadowRadius: 18,
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 9,
+    ...shadows.glow,
     overflow: 'hidden',
   },
-  pulse: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: 'rgba(85, 255, 23, 0.08)',
+  sm: {
+    minHeight: 38,
+    paddingHorizontal: spacing.md,
   },
-  innerGlow: {
-    position: 'absolute',
-    left: 8,
-    right: 8,
-    bottom: -9,
-    height: 20,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+  md: {
+    minHeight: 52,
+  },
+  lg: {
+    minHeight: 58,
+  },
+  outlineButton: {
+    backgroundColor: 'transparent',
+  },
+  buttonDisabled: {
+    ...shadows.none,
   },
   title: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.button,
+    color: colors.textInverse,
     textTransform: 'uppercase',
   },
   disabledTitle: {

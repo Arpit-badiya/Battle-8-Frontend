@@ -11,44 +11,20 @@ import NetworkBanner from '../../components/common/NetworkBanner';
 import Screen from '../../components/common/Screen';
 import ContestCard from '../../components/contest/ContestCard';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
 import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import useAuth from '../../hooks/useAuth';
 import { showError } from '../../utils/feedback';
 
-const categories = [
-  { label: 'All Contests', icon: 'trophy' },
-  { label: 'Hot Contests', icon: 'flame' },
-  { label: 'Mega Contests', icon: 'diamond' },
-  { label: 'Practice', icon: 'game-controller' },
-];
 const gameOptions = ['All', 'BGMI', 'Free Fire', 'Valorant', 'COD Mobile'];
-const typeOptions = [
-  { value: 'All', label: 'All' },
-  { value: 'fantasy', label: 'Fantasy' },
-  { value: 'team', label: 'Team' },
-];
 
-const Hero = ({ onPress }) => (
-  <Pressable onPress={onPress}>
-    <GlassCard style={styles.hero} glow>
-    <View style={styles.heroSparkOne} />
-    <View style={styles.heroSparkTwo} />
-    <View style={styles.heroCopy}>
-      <Text style={styles.heroTitle}>CREATE YOUR TEAM</Text>
-      <Text style={styles.heroTitle}>JOIN CONTESTS</Text>
-      <Text style={styles.heroWin}>WIN COINS</Text>
-      <View style={styles.playNow}>
-        <Text style={styles.playNowText}>PLAY NOW</Text>
-      </View>
-    </View>
-    <View style={styles.heroSoldiers}>
-      <GameAvatar name="A" size={74} />
-      <GameAvatar name="B" size={74} />
-    </View>
-    </GlassCard>
-  </Pressable>
+const StatItem = ({ label, value, highlight }) => (
+  <View style={styles.statItem}>
+    <Text style={[styles.statValue, highlight && styles.statHighlight]}>{value}</Text>
+    <Text style={styles.statLabel}>{label}</Text>
+  </View>
 );
 
 const HomeScreen = ({ navigation }) => {
@@ -60,9 +36,11 @@ const HomeScreen = ({ navigation }) => {
     refreshContests,
     refreshWallet,
     setActiveContestId,
+    wallet,
   } = useAppData();
   const fade = useRef(new Animated.Value(0)).current;
   const [selectedGame, setSelectedGame] = useState('All');
+
   const visibleContests = useMemo(
     () =>
       selectedGame === 'All'
@@ -70,6 +48,20 @@ const HomeScreen = ({ navigation }) => {
         : contests.filter((contest) => (contest.game || 'BGMI') === selectedGame),
     [contests, selectedGame]
   );
+
+  const featuredContest = visibleContests[0];
+
+  const stats = useMemo(() => {
+    const joined = contests.filter((c) => c.userJoined).length;
+    const teams = contests.filter((c) => c.teamCreated).length;
+    const winnings = wallet?.winningCoins ?? wallet?.balance ?? 0;
+    return [
+      { label: 'Global Rank', value: '-', highlight: true },
+      { label: 'Winnings', value: winnings, highlight: false },
+      { label: 'My Teams', value: teams, highlight: false },
+      { label: 'Played', value: joined, highlight: false },
+    ];
+  }, [contests, wallet]);
 
   useFocusEffect(
     useCallback(() => {
@@ -123,48 +115,61 @@ const HomeScreen = ({ navigation }) => {
     <Screen>
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         <NetworkBanner network={network} />
+
         <View style={styles.topBar}>
           <View style={styles.greeting}>
             <Pressable onPress={() => navigation.navigate('Profile')} hitSlop={10}>
-              <GameAvatar name={displayName} size={46} />
+              <GameAvatar name={displayName} size={42} />
             </Pressable>
             <View>
-              <Text style={styles.hello}>Hello, {displayName}</Text>
-              <Text style={styles.rankLabel}>Pro Player</Text>
+              <Text style={styles.hello}>Ready to compete?</Text>
+              <Text style={styles.rankLabel}>{displayName}</Text>
             </View>
           </View>
           <View style={styles.actions}>
             <CoinBadge amount={user?.coins ?? 0} />
-            <Pressable style={styles.addCoin} onPress={() => navigation.navigate('Wallet')}>
-              <Ionicons name="add" size={22} color={colors.white} />
+            <Pressable style={styles.iconAction} onPress={() => navigation.navigate('Wallet')}>
+              <Ionicons name="add" size={20} color={colors.white} />
+            </Pressable>
+            <Pressable style={styles.iconAction}>
+              <Ionicons name="notifications-outline" size={20} color={colors.white} />
             </Pressable>
           </View>
         </View>
 
         <AnimatedView>
-          <Hero onPress={() => navigation.navigate('MyContests')} />
+          <GlassCard style={styles.statsCard}>
+            {stats.map((item, index) => (
+              <View key={item.label} style={styles.statWrap}>
+                <StatItem label={item.label} value={item.value} highlight={item.highlight} />
+                {index < stats.length - 1 && <View style={styles.statDivider} />}
+              </View>
+            ))}
+          </GlassCard>
         </AnimatedView>
 
-        <GlassCard style={styles.coinComingSoon}>
-          <View style={styles.coinIcon}>
-            <Ionicons name="wallet" size={22} color={colors.coin} />
-          </View>
-          <View style={styles.coinCopy}>
-            <Text style={styles.coinTitle}>Earn Coins</Text>
-            <Text style={styles.coinSub}>Watch ads for entry coins. Winnings stay withdrawable.</Text>
-          </View>
-        </GlassCard>
-
-        <View style={styles.categoryRow}>
-          {categories.map((item, index) => (
-            <AnimatedView key={item.label} delay={index * 70} style={styles.categoryWrap}>
-              <GlassCard style={styles.categoryCard}>
-                <Ionicons name={item.icon} size={27} color={index === 1 ? colors.white : colors.coin} />
-              </GlassCard>
-              <Text style={styles.categoryText}>{item.label}</Text>
-            </AnimatedView>
-          ))}
-        </View>
+        {featuredContest && (
+          <AnimatedView delay={80}>
+            <GlassCard style={styles.featuredCard} glow>
+              <View style={styles.featuredWatermark}>
+                <Ionicons name="trophy" size={140} color="rgba(232,181,58,0.08)" />
+              </View>
+              <View style={styles.featuredBadge}>
+                <Text style={styles.featuredBadgeText}>FEATURED</Text>
+              </View>
+              <View style={styles.featuredCopy}>
+                <Text style={styles.featuredTitle}>{featuredContest.title || 'Champions Circuit'}</Text>
+                <Text style={styles.featuredPrize}>Prize Pool {featuredContest.prizePool || 0} coins</Text>
+                <Pressable
+                  style={styles.featuredButton}
+                  onPress={() => handleJoin(featuredContest)}
+                >
+                  <Text style={styles.featuredButtonText}>Join Now</Text>
+                </Pressable>
+              </View>
+            </GlassCard>
+          </AnimatedView>
+        )}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Upcoming Contests</Text>
@@ -222,10 +227,11 @@ const styles = StyleSheet.create({
     paddingBottom: 108,
   },
   topBar: {
-    minHeight: 72,
+    minHeight: 64,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    marginTop: spacing.sm,
   },
   greeting: {
     flexDirection: 'row',
@@ -235,13 +241,11 @@ const styles = StyleSheet.create({
   },
   hello: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '900',
+    ...typography.subtitle,
   },
   rankLabel: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    ...typography.caption,
     marginTop: 2,
   },
   actions: {
@@ -249,127 +253,96 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  addCoin: {
-    width: 31,
-    height: 31,
-    borderRadius: 8,
+  iconAction: {
+    width: 34,
+    height: 34,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
   },
-  hero: {
-    height: 150,
-    padding: spacing.lg,
+  statsCard: {
+    flexDirection: 'row',
+    marginTop: spacing.md,
+    paddingVertical: spacing.lg,
+  },
+  statWrap: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    borderColor: 'rgba(255,191,24,0.35)',
   },
-  heroCopy: {
+  statItem: {
     flex: 1,
-    zIndex: 2,
+    alignItems: 'center',
   },
-  heroTitle: {
+  statValue: {
     color: colors.text,
     fontSize: 18,
     fontWeight: '900',
-    lineHeight: 22,
   },
-  heroWin: {
+  statHighlight: {
     color: colors.primary,
-    fontSize: 20,
-    fontWeight: '900',
+  },
+  statLabel: {
+    color: colors.textMuted,
+    ...typography.micro,
     marginTop: 2,
   },
-  playNow: {
+  statDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: colors.borderSoft,
+  },
+  featuredCard: {
+    minHeight: 160,
+    marginTop: spacing.md,
+    padding: spacing.lg,
+    justifyContent: 'flex-end',
+    overflow: 'hidden',
+  },
+  featuredWatermark: {
+    position: 'absolute',
+    right: -20,
+    top: -10,
+  },
+  featuredBadge: {
+    position: 'absolute',
+    top: spacing.md,
+    left: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  featuredBadgeText: {
+    color: colors.textInverse,
+    ...typography.micro,
+  },
+  featuredCopy: {
+    maxWidth: '70%',
+  },
+  featuredTitle: {
+    color: colors.text,
+    ...typography.h3,
+  },
+  featuredPrize: {
+    color: colors.primary,
+    ...typography.subtitle,
+    marginTop: spacing.xs,
+  },
+  featuredButton: {
     alignSelf: 'flex-start',
-    marginTop: spacing.lg,
-    backgroundColor: colors.coin,
-    borderRadius: 6,
+    marginTop: spacing.md,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
   },
-  playNowText: {
-    color: colors.black,
-    fontWeight: '900',
-    fontSize: 12,
-  },
-  heroSoldiers: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: -8,
-  },
-  heroSparkOne: {
-    position: 'absolute',
-    right: 10,
-    bottom: -25,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255, 191, 24, 0.16)',
-  },
-  heroSparkTwo: {
-    position: 'absolute',
-    left: 10,
-    top: 8,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(85, 255, 23, 0.08)',
-  },
-  coinComingSoon: {
-    marginTop: spacing.md,
-    minHeight: 68,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    padding: spacing.md,
-  },
-  coinIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,191,24,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,191,24,0.2)',
-  },
-  coinCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-  coinTitle: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-  coinSub: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    marginTop: 2,
-  },
-  categoryRow: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginTop: spacing.md,
-  },
-  categoryWrap: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  categoryCard: {
-    width: '100%',
-    height: 46,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryText: {
-    color: colors.text,
-    fontSize: 10,
-    fontWeight: '800',
-    marginTop: spacing.xs,
-    textAlign: 'center',
+  featuredButtonText: {
+    color: colors.textInverse,
+    ...typography.button,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -384,8 +357,7 @@ const styles = StyleSheet.create({
   },
   link: {
     color: colors.primary,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.caption,
   },
   gameFilter: {
     gap: spacing.sm,
@@ -393,7 +365,7 @@ const styles = StyleSheet.create({
   },
   gamePill: {
     minHeight: 34,
-    borderRadius: 9,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -403,20 +375,18 @@ const styles = StyleSheet.create({
   },
   gamePillActive: {
     borderColor: colors.primary,
-    backgroundColor: 'rgba(85,255,23,0.14)',
+    backgroundColor: colors.primarySoft,
   },
   gamePillText: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
+    ...typography.caption,
   },
   gamePillTextActive: {
     color: colors.primary,
   },
   emptyText: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '800',
+    ...typography.bodySmall,
     textAlign: 'center',
     paddingVertical: spacing.xl,
   },

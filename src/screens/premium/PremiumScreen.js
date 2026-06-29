@@ -2,13 +2,17 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Badge from '../../components/common/Badge';
 import Button from '../../components/common/Button';
 import GlassCard from '../../components/common/GlassCard';
 import Header from '../../components/common/Header';
 import Loader from '../../components/common/Loader';
 import Screen from '../../components/common/Screen';
+import StatusChip from '../../components/common/StatusChip';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import { claimPremiumDailyBonus, getPremiumStatus } from '../../services/premiumService';
 import { showError, showSuccess } from '../../utils/feedback';
@@ -58,9 +62,20 @@ const PremiumScreen = ({ navigation }) => {
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <GlassCard style={styles.hero} glow>
-            <Ionicons name="diamond" size={48} color={colors.coin} />
-            <Text style={styles.title}>{status?.active ? 'Premium Active' : 'Battle Pass Premium'}</Text>
-            <Text style={styles.sub}>Manual dummy subscription now. Ready for Play Billing or payout gateways later.</Text>
+            <View style={styles.heroTop}>
+              <View style={styles.heroCopy}>
+                <Text style={styles.eyebrow}>Premium access</Text>
+                <Text style={styles.title}>{status?.active ? 'Premium Active' : 'Battle Pass Premium'}</Text>
+                <Text style={styles.sub}>
+                  Unlock an ad-free experience, faster joins, and daily bonus coins.
+                </Text>
+              </View>
+              <StatusChip status={status?.active ? 'completed' : 'upcoming'} />
+            </View>
+            <View style={styles.badges}>
+              <Badge label="No ads" tone="gold" compact />
+              <Badge label="Daily bonus" tone="blue" compact />
+            </View>
           </GlassCard>
 
           <GlassCard style={styles.panel}>
@@ -81,12 +96,24 @@ const PremiumScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   content: { padding: spacing.screen, paddingBottom: 110, gap: spacing.md },
-  hero: { minHeight: 180, padding: spacing.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  title: { color: colors.text, fontSize: 24, fontWeight: '900', textAlign: 'center' },
-  sub: { color: colors.textMuted, fontSize: 13, fontWeight: '800', textAlign: 'center', lineHeight: 19 },
+  hero: { minHeight: 180, padding: spacing.xl, gap: spacing.md },
+  heroTop: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: spacing.md },
+  heroCopy: { flex: 1, minWidth: 0 },
+  eyebrow: { color: colors.primary, ...typography.caption, textTransform: 'uppercase' },
+  title: { color: colors.text, ...typography.h1 },
+  sub: { color: colors.textMuted, ...typography.caption, lineHeight: 18, marginTop: spacing.xs },
+  badges: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   panel: { padding: spacing.lg, gap: spacing.md },
-  benefit: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  benefitText: { color: colors.text, fontSize: 15, fontWeight: '900' },
+  benefit: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    minHeight: 44,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    backgroundColor: colors.surfaceMuted,
+  },
+  benefitText: { color: colors.text, ...typography.body },
 });
 
 export default PremiumScreen;

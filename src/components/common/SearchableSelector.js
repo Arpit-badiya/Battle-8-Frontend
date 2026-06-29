@@ -26,6 +26,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
+import shadows from '../../constants/shadows';
 import spacing from '../../constants/spacing';
 
 const ITEM_HEIGHT = 48;
@@ -219,15 +221,16 @@ const styles = StyleSheet.create({
   },
   trigger: {
     minHeight: 44,
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceElevated,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
+    ...shadows.sm,
   },
   triggerDisabled: {
     opacity: 0.5,
@@ -246,18 +249,18 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.72)',
+    backgroundColor: 'rgba(0,0,0,0.76)',
   },
   backdrop: {
     ...StyleSheet.absoluteFillObject,
   },
   sheet: {
     backgroundColor: '#0a1318',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     borderTopWidth: 1,
     borderColor: colors.borderSoft,
-    maxHeight: '80%',
+    maxHeight: '78%',
     minHeight: 320,
   },
   sheetHeader: {
@@ -288,7 +291,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginVertical: spacing.md,
     minHeight: 42,
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -310,7 +313,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,
     backgroundColor: 'rgba(85,255,23,0.14)',
-    borderRadius: 8,
+    borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
   },
@@ -355,7 +358,7 @@ const styles = StyleSheet.create({
     margin: spacing.lg,
     marginTop: spacing.sm,
     minHeight: 46,
-    borderRadius: 10,
+    borderRadius: radius.md,
     backgroundColor: colors.primaryDark,
     alignItems: 'center',
     justifyContent: 'center',

@@ -11,7 +11,9 @@ import SearchableSelector from '../../components/common/SearchableSelector';
 import PlayerCard from '../../components/team/PlayerCard';
 import TeamHeader from '../../components/team/TeamHeader';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import { getMyTeam } from '../../services/contestService';
 import { getContestPlayers } from '../../services/playerService';
@@ -20,7 +22,7 @@ import { showError } from '../../utils/feedback';
 const roles = ['All', 'IGL', 'Assaulter', 'Supporter'];
 const MAX_PLAYERS = 8;
 const MAX_CREDITS = 75;
-const PLAYER_ROW_HEIGHT = 66;
+const PLAYER_ROW_HEIGHT = 70;
 const getPlayerId = (player = {}) => String(player.id || player._id || '');
 
 const TeamBuilderScreen = ({ navigation, route }) => {
@@ -31,8 +33,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
     routeContest;
   const contestId = contest?.id || contest?._id;
 
-  // selected: array of player id strings (order preserved)
-  // selectedPlayerMap: id → player object (survives team tab switches)
   const [selected, setSelected] = useState([]);
   const [selectedPlayerMap, setSelectedPlayerMap] = useState({});
   const [role, setRole] = useState('All');
@@ -41,9 +41,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
   const [myTeam, setMyTeam] = useState(null);
   const [loadingContestPlayers, setLoadingContestPlayers] = useState(false);
 
-  // Keep a ref so togglePlayer always reads the latest selectedTeamName
-  // without needing to be in its dependency array (avoids stale-closure bug
-  // when FlatList renders with a cached renderItem).
   const selectedTeamNameRef = useRef(selectedTeamName);
   useEffect(() => {
     selectedTeamNameRef.current = selectedTeamName;
@@ -51,7 +48,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
 
   const isContestLocked = ['live', 'completed', 'cancelled'].includes(contest?.status);
 
-  // Reset all local state when the contest changes
   useEffect(() => {
     setSelected([]);
     setSelectedPlayerMap({});
@@ -111,7 +107,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
     [contestPlayers]
   );
 
-  // Keep selectedPlayerMap in sync when contestPlayers refreshes
   useEffect(() => {
     if (selected.length === 0 || contestPlayersById.size === 0) return;
 
@@ -175,8 +170,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
     [availablePlayers, selectedPlayers]
   );
 
-  // togglePlayer uses a ref for selectedTeamName so the FlatList renderItem
-  // callback never goes stale when the user switches team tabs.
   const togglePlayer = useCallback(
     (player) => {
       const playerId = getPlayerId(player);
@@ -185,7 +178,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
       const isSelected = selectedSet.has(playerId);
 
       if (isSelected) {
-        // Deselect: remove from both arrays atomically via functional updates
         setSelected((prev) => prev.filter((id) => id !== playerId));
         setSelectedPlayerMap((prev) => {
           const next = { ...prev };
@@ -195,7 +187,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
         return;
       }
 
-      // Select guards
       if (!selectedTeamNameRef.current) {
         Alert.alert('Select team', 'Choose an esports team before selecting players.');
         return;
@@ -213,12 +204,9 @@ const TeamBuilderScreen = ({ navigation, route }) => {
         return;
       }
 
-      // Add to both maps atomically
       setSelected((prev) => [...prev, playerId]);
       setSelectedPlayerMap((prev) => ({ ...prev, [playerId]: player }));
     },
-    // selectedSet and selectedPlayers are derived from selected — including them
-    // keeps the guards accurate without stale reads.
     [creatingTeam, isContestLocked, selected, selectedPlayers, selectedSet]
   );
 
@@ -254,8 +242,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
     [creatingTeam, isContestLocked]
   );
 
-  // extraData includes selectedSet AND togglePlayer so FlatList re-renders
-  // correctly when either the selection or the callback changes.
   const flatListExtraData = useMemo(
     () => ({ selectedSet, togglePlayer }),
     [selectedSet, togglePlayer]
@@ -289,7 +275,6 @@ const TeamBuilderScreen = ({ navigation, route }) => {
       <Header
         title="Create Team"
         onBack={() => navigation.goBack()}
-        right={<Ionicons name="help-circle-outline" size={28} color={colors.text} />}
       />
 
       {myTeam ? (
@@ -394,7 +379,7 @@ const TeamBuilderScreen = ({ navigation, route }) => {
           <Button
             title={
               selected.length === MAX_PLAYERS
-                ? 'Next'
+                ? 'Next: Pick Captain'
                 : `Select Players (${selected.length}/${MAX_PLAYERS})`
             }
             disabled={
@@ -431,8 +416,7 @@ const styles = StyleSheet.create({
   },
   myTeamTitle: {
     color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
+    ...typography.h3,
   },
   myTeamStats: {
     flexDirection: 'row',
@@ -441,8 +425,7 @@ const styles = StyleSheet.create({
   myTeamStat: {
     flex: 1,
     color: colors.primary,
-    fontSize: 12,
-    fontWeight: '900',
+    ...typography.caption,
   },
   myPlayerRow: {
     minHeight: 48,
@@ -457,19 +440,16 @@ const styles = StyleSheet.create({
   },
   myPlayerName: {
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
   myPlayerMeta: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
+    ...typography.micro,
     marginTop: 2,
   },
   myPlayerPoints: {
     color: colors.coin,
-    fontSize: 16,
-    fontWeight: '900',
+    ...typography.subtitle,
   },
   roleStat: {
     flex: 1,
@@ -477,17 +457,15 @@ const styles = StyleSheet.create({
   },
   roleStatValue: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: '900',
+    ...typography.h3,
   },
   roleStatLabel: {
     color: colors.textMuted,
-    fontSize: 11,
+    ...typography.micro,
     marginTop: 2,
-    fontWeight: '700',
   },
   roleLine: {
-    width: 26,
+    width: 24,
     height: 2,
     borderRadius: 2,
     backgroundColor: colors.primary,
@@ -504,19 +482,19 @@ const styles = StyleSheet.create({
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
   },
   activeRole: {
-    backgroundColor: 'rgba(85,255,23,0.14)',
+    backgroundColor: colors.primary,
   },
   roleText: {
     color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '900',
+    ...typography.micro,
     textAlign: 'center',
   },
   activeRoleText: {
-    color: colors.primary,
+    color: colors.textInverse,
   },
   playerPanel: {
     marginHorizontal: spacing.screen,
@@ -533,18 +511,15 @@ const styles = StyleSheet.create({
   },
   helper: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '800',
+    ...typography.caption,
   },
   creditHead: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '800',
+    ...typography.caption,
   },
   emptyText: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '800',
+    ...typography.bodySmall,
     textAlign: 'center',
     padding: spacing.lg,
   },

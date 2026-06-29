@@ -2,7 +2,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Button from '../../components/common/Button';
 import BrandLogo from '../../components/common/BrandLogo';
 import GlassCard from '../../components/common/GlassCard';
@@ -10,7 +10,9 @@ import Header from '../../components/common/Header';
 import Screen from '../../components/common/Screen';
 import SearchableSelector from '../../components/common/SearchableSelector';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import {
   cancelContest,
@@ -36,6 +38,7 @@ import {
   updateWithdrawalStatus,
 } from '../../services/adminService';
 import { getContestPlayers } from '../../services/playerService';
+import { syncTournament } from '../../services/tournamentService';
 import { showError, showSuccess } from '../../utils/feedback';
 
 const initialContest = {
@@ -56,6 +59,13 @@ const initialPlayer = {
   team: '',
   credits: '',
   role: 'Assaulter',
+};
+
+const initialTournamentSync = {
+  name: '',
+  source: '16score',
+  sourceUrl: '',
+  autoSync: false,
 };
 
 const emptyBulkPlayer = () => ({ name: '', credits: '', role: 'Assaulter' });
@@ -151,6 +161,13 @@ const contestTypeOptions = [
   { value: 'team', label: 'Team Contest' },
 ];
 
+const tournamentSourceOptions = [
+  { value: '16score', label: '16Score' },
+  { value: 'manual', label: 'Manual' },
+];
+
+const tournamentSourceLabels = tournamentSourceOptions.map((item) => item.label);
+
 const ContestTypePicker = ({ value, onChange }) => (
   <View style={styles.rolePicker}>
     {contestTypeOptions.map((item) => {
@@ -170,6 +187,9 @@ const AdminScreen = ({ navigation }) => {
   const [withdrawals, setWithdrawals] = useState([]);
   const [adRewards, setAdRewards] = useState([]);
   const [contestForm, setContestForm] = useState(initialContest);
+  const [tournamentSyncForm, setTournamentSyncForm] = useState(initialTournamentSync);
+  const [tournamentSyncing, setTournamentSyncing] = useState(false);
+  const [tournamentSyncResult, setTournamentSyncResult] = useState(null);
   const [playerForm, setPlayerForm] = useState(initialPlayer);
   const [bulkGame, setBulkGame] = useState('BGMI');
   const [bulkTeamName, setBulkTeamName] = useState('');
@@ -195,6 +215,8 @@ const AdminScreen = ({ navigation }) => {
   );
 
   const isTeamContest = selectedContest?.contestType === 'team';
+  const selectedTournamentSourceLabel =
+    tournamentSourceOptions.find((item) => item.value === tournamentSyncForm.source)?.label || '';
 
   const getTeamNamesForGame = useCallback(
     (game) => [...new Set(players.filter((player) => getGame(player) === game).map((player) => player.team).filter(Boolean))].sort(),
@@ -359,6 +381,55 @@ const AdminScreen = ({ navigation }) => {
       showError('Contest creation failed', error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const submitTournamentSync = async () => {
+    const name = tournamentSyncForm.name.trim();
+    const source = tournamentSyncForm.source;
+    const sourceUrl = tournamentSyncForm.sourceUrl.trim();
+
+    if (!name) {
+      Alert.alert('Tournament required', 'Tournament Name is required.');
+      return;
+    }
+
+    if (!source) {
+      Alert.alert('Source required', 'Tournament Source is required.');
+      return;
+    }
+
+    if (source === '16score') {
+      if (!sourceUrl) {
+        Alert.alert('Source URL required', 'Tournament Source URL is required for 16Score.');
+        return;
+      }
+
+      if (!sourceUrl.startsWith('https://www.16score.com/')) {
+        Alert.alert('Invalid URL', 'Tournament Source URL must start with https://www.16score.com/.');
+        return;
+      }
+    }
+
+    setTournamentSyncing(true);
+    setTournamentSyncResult(null);
+
+    try {
+      const response = await syncTournament({
+        name,
+        source,
+        sourceUrl,
+        autoSync: tournamentSyncForm.autoSync,
+      });
+
+      setTournamentSyncResult({
+        htmlLength: response.htmlLength || 0,
+      });
+      showSuccess('Tournament synced successfully.');
+    } catch (error) {
+      showError('Tournament sync failed', error);
+    } finally {
+      setTournamentSyncing(false);
     }
   };
 
@@ -926,6 +997,68 @@ const AdminScreen = ({ navigation }) => {
         </GlassCard>
 
         <GlassCard style={styles.panel}>
+          <Text style={styles.panelTitle}>Tournament Management</Text>
+          <Field
+            label="Tournament Name"
+            value={tournamentSyncForm.name}
+            onChangeText={(name) => setTournamentSyncForm((current) => ({ ...current, name }))}
+          />
+          <SearchableSelector
+            label="Tournament Source"
+            value={selectedTournamentSourceLabel}
+            placeholder="Select source"
+            options={tournamentSourceLabels}
+            onSelect={(label) => {
+              const source = tournamentSourceOptions.find((item) => item.label === label)?.value || '';
+              setTournamentSyncForm((current) => ({
+                ...current,
+                source,
+                sourceUrl: source === '16score' ? current.sourceUrl : '',
+              }));
+              setTournamentSyncResult(null);
+            }}
+            emptyText="No sources found."
+          />
+          <Field
+            label="Tournament Source URL"
+            value={tournamentSyncForm.sourceUrl}
+            placeholder="https://www.16score.com/..."
+            onChangeText={(sourceUrl) => setTournamentSyncForm((current) => ({ ...current, sourceUrl }))}
+          />
+          <View style={styles.syncSwitchRow}>
+            <View style={styles.syncSwitchCopy}>
+              <Text style={styles.label}>Auto Sync</Text>
+              <Text style={styles.statusLine}>{tournamentSyncForm.autoSync ? 'Enabled' : 'Disabled'}</Text>
+            </View>
+            <Switch
+              value={tournamentSyncForm.autoSync}
+              onValueChange={(autoSync) => setTournamentSyncForm((current) => ({ ...current, autoSync }))}
+              disabled={tournamentSyncing}
+              trackColor={{ false: colors.surfaceMuted, true: colors.primarySoft }}
+              thumbColor={tournamentSyncForm.autoSync ? colors.primary : colors.textMuted}
+            />
+          </View>
+          {tournamentSyncing && (
+            <View style={styles.syncStatusRow}>
+              <ActivityIndicator color={colors.primary} />
+              <Text style={styles.statusLine}>Syncing...</Text>
+            </View>
+          )}
+          {tournamentSyncResult && (
+            <View style={styles.importSummary}>
+              <Text style={styles.accountingPrize}>Tournament synced successfully.</Text>
+              <Text style={styles.accountingText}>HTML downloaded.</Text>
+              <Text style={styles.accountingText}>HTML size: {tournamentSyncResult.htmlLength} bytes.</Text>
+            </View>
+          )}
+          <Button
+            title={tournamentSyncing ? 'Syncing...' : 'Sync Tournament'}
+            disabled={saving || tournamentSyncing}
+            onPress={submitTournamentSync}
+          />
+        </GlassCard>
+
+        <GlassCard style={styles.panel}>
           <Text style={styles.panelTitle}>Create Contest</Text>
           <View style={styles.field}>
             <Text style={styles.label}>Game</Text>
@@ -1317,13 +1450,11 @@ const styles = StyleSheet.create({
   },
   brandTitle: {
     color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
+    ...typography.title,
   },
   brandSub: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    ...typography.micro,
     marginTop: 2,
   },
   stats: {
@@ -1336,14 +1467,12 @@ const styles = StyleSheet.create({
   },
   statValue: {
     color: colors.text,
-    fontSize: 20,
-    fontWeight: '900',
+    ...typography.h3,
   },
   statLabel: {
     color: colors.textMuted,
-    fontSize: 11,
+    ...typography.micro,
     marginTop: spacing.xs,
-    fontWeight: '800',
   },
   panel: {
     padding: spacing.lg,
@@ -1351,8 +1480,7 @@ const styles = StyleSheet.create({
   },
   panelTitle: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '900',
+    ...typography.subtitle,
   },
   row: {
     flexDirection: 'row',
@@ -1368,7 +1496,7 @@ const styles = StyleSheet.create({
   bulkIndex: {
     width: 22,
     color: colors.primary,
-    fontWeight: '900',
+    ...typography.caption,
     textAlign: 'center',
   },
   bulkName: {
@@ -1385,7 +1513,7 @@ const styles = StyleSheet.create({
   rolePicker: {
     minHeight: 42,
     flexDirection: 'row',
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -1398,16 +1526,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xs,
   },
   roleOptionActive: {
-    backgroundColor: 'rgba(85,255,23,0.16)',
+    backgroundColor: colors.primary,
   },
   roleOptionText: {
     color: colors.textMuted,
-    fontSize: 10,
-    fontWeight: '900',
+    ...typography.micro,
     textAlign: 'center',
   },
   roleOptionTextActive: {
-    color: colors.primary,
+    color: colors.textInverse,
   },
   gamePicker: {
     minHeight: 42,
@@ -1417,7 +1544,7 @@ const styles = StyleSheet.create({
   },
   gameOption: {
     minHeight: 36,
-    borderRadius: 9,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -1427,16 +1554,15 @@ const styles = StyleSheet.create({
   },
   gameOptionActive: {
     borderColor: colors.primary,
-    backgroundColor: 'rgba(85,255,23,0.14)',
+    backgroundColor: colors.primary,
   },
   gameOptionText: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '900',
+    ...typography.micro,
     maxWidth: 96,
   },
   gameOptionTextActive: {
-    color: colors.primary,
+    color: colors.textInverse,
   },
   controlGrid: {
     flexDirection: 'row',
@@ -1446,7 +1572,7 @@ const styles = StyleSheet.create({
   controlButton: {
     minWidth: '30%',
     minHeight: 38,
-    borderRadius: 10,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -1456,8 +1582,7 @@ const styles = StyleSheet.create({
   },
   controlText: {
     color: colors.text,
-    fontSize: 11,
-    fontWeight: '900',
+    ...typography.micro,
     textTransform: 'uppercase',
   },
   economyRow: {
@@ -1475,13 +1600,11 @@ const styles = StyleSheet.create({
   },
   economyTitle: {
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.caption,
   },
   economyMeta: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
+    ...typography.micro,
     marginTop: 2,
   },
   economyActions: {
@@ -1493,19 +1616,18 @@ const styles = StyleSheet.create({
   },
   miniButton: {
     minHeight: 28,
-    borderRadius: 7,
+    borderRadius: radius.sm,
     paddingHorizontal: spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.primary,
   },
   dangerButton: {
     backgroundColor: colors.danger,
   },
   miniText: {
-    color: colors.white,
-    fontSize: 9,
-    fontWeight: '900',
+    color: colors.textInverse,
+    ...typography.micro,
     textTransform: 'uppercase',
   },
   field: {
@@ -1514,23 +1636,22 @@ const styles = StyleSheet.create({
   },
   label: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
+    ...typography.caption,
     marginBottom: spacing.xs,
   },
   input: {
-    minHeight: 44,
-    borderRadius: 10,
+    minHeight: 46,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
     color: colors.text,
     paddingHorizontal: spacing.md,
-    fontWeight: '800',
+    ...typography.bodySmall,
   },
   dateButton: {
-    minHeight: 44,
-    borderRadius: 10,
+    minHeight: 46,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -1539,15 +1660,14 @@ const styles = StyleSheet.create({
   },
   dateText: {
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '800',
+    ...typography.bodySmall,
   },
   datePlaceholder: {
     color: colors.textDim,
   },
   selectButton: {
-    minHeight: 44,
-    borderRadius: 10,
+    minHeight: 46,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -1560,20 +1680,18 @@ const styles = StyleSheet.create({
   selectText: {
     flex: 1,
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
   selectPlaceholder: {
     color: colors.textDim,
   },
   selectChevron: {
     color: colors.primary,
-    fontSize: 9,
-    fontWeight: '900',
+    ...typography.micro,
   },
   selectPanel: {
     marginTop: spacing.xs,
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -1585,13 +1703,13 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSoft,
     color: colors.text,
     paddingHorizontal: spacing.md,
-    fontWeight: '800',
+    ...typography.bodySmall,
   },
   selectList: {
     maxHeight: 178,
   },
   accountingBox: {
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: 'rgba(255,255,255,0.05)',
@@ -1600,17 +1718,15 @@ const styles = StyleSheet.create({
   },
   accountingText: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
+    ...typography.caption,
   },
   accountingPrize: {
     color: colors.coin,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.subtitle,
   },
   teamDropdown: {
     maxHeight: 178,
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -1627,21 +1743,19 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.borderSoft,
   },
   teamOptionActive: {
-    backgroundColor: 'rgba(85,255,23,0.12)',
+    backgroundColor: colors.primarySoft,
   },
   teamOptionText: {
     flex: 1,
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
   teamOptionTextActive: {
     color: colors.primary,
   },
   teamSelectedMark: {
     color: colors.primary,
-    fontSize: 9,
-    fontWeight: '900',
+    ...typography.micro,
   },
   chipWrap: {
     flexDirection: 'row',
@@ -1650,7 +1764,7 @@ const styles = StyleSheet.create({
   },
   chip: {
     maxWidth: '100%',
-    borderRadius: 14,
+    borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
@@ -1659,21 +1773,36 @@ const styles = StyleSheet.create({
   },
   chipActive: {
     borderColor: colors.primary,
-    backgroundColor: 'rgba(85, 255, 23, 0.12)',
+    backgroundColor: colors.primary,
   },
   chipText: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
+    ...typography.caption,
     maxWidth: 220,
   },
   chipTextActive: {
-    color: colors.primary,
+    color: colors.textInverse,
   },
   statusLine: {
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.caption,
+  },
+  syncSwitchRow: {
+    minHeight: 48,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  syncSwitchCopy: {
+    flex: 1,
+    minWidth: 0,
+  },
+  syncStatusRow: {
+    minHeight: 32,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
   },
   importRow: {
     gap: spacing.sm,
@@ -1681,15 +1810,14 @@ const styles = StyleSheet.create({
   importSummary: {
     borderWidth: 1,
     borderColor: colors.borderSoft,
-    backgroundColor: 'rgba(177,255,0,0.06)',
-    borderRadius: 10,
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.md,
     padding: spacing.md,
     gap: spacing.xs,
   },
   emptyText: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '800',
+    ...typography.bodySmall,
     textAlign: 'center',
     padding: spacing.md,
   },
@@ -1707,30 +1835,28 @@ const styles = StyleSheet.create({
   },
   resultName: {
     color: colors.text,
-    fontSize: 13,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
   resultTeam: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
+    ...typography.micro,
   },
   smallInput: {
     width: 48,
     minHeight: 38,
-    borderRadius: 9,
+    borderRadius: radius.sm,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
     color: colors.text,
     textAlign: 'center',
-    fontWeight: '900',
+    ...typography.caption,
   },
   resultPoints: {
     width: 44,
     color: colors.coin,
     textAlign: 'right',
-    fontWeight: '900',
+    ...typography.caption,
   },
   leaderRow: {
     minHeight: 42,
@@ -1743,11 +1869,11 @@ const styles = StyleSheet.create({
   leaderText: {
     flex: 1,
     color: colors.text,
-    fontWeight: '800',
+    ...typography.bodySmall,
   },
   leaderPoints: {
     color: colors.primary,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
 });
 

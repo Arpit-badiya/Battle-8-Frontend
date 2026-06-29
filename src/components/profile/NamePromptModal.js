@@ -4,6 +4,7 @@ import { KeyboardAvoidingView, Modal, Platform, StyleSheet, Text, TextInput, Vie
 import Button from '../common/Button';
 import GlassCard from '../common/GlassCard';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
 
 const normalizeName = (value = '') => value.trim().replace(/\s+/g, ' ');
@@ -91,7 +92,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     width: 64,
     height: 64,
-    borderRadius: 20,
+    borderRadius: radius.xl,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surfaceElevated,
@@ -116,7 +117,7 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: 50,
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.border,
     backgroundColor: colors.surface,

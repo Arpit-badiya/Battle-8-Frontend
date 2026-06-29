@@ -2,7 +2,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import GameAvatar from '../common/GameAvatar';
 
 const PlayerCard = ({ player, selected, disabled, onToggle }) => (
@@ -16,7 +18,7 @@ const PlayerCard = ({ player, selected, disabled, onToggle }) => (
       pressed && styles.pressedCard,
     ]}
   >
-    <GameAvatar name={player.name} size={42} />
+    <GameAvatar name={player.name} size={44} />
     <View style={styles.info}>
       <Text numberOfLines={1} style={styles.name}>
         {player.name}
@@ -25,14 +27,16 @@ const PlayerCard = ({ player, selected, disabled, onToggle }) => (
         {player.team || 'Team'}
       </Text>
     </View>
-    <Text numberOfLines={1} style={styles.role}>
-      {player.role}
-    </Text>
-    <Text style={styles.credits}>
-      {Number(player.credits || 0).toFixed(1)}
-    </Text>
+    <View style={styles.tags}>
+      <Text numberOfLines={1} style={styles.role}>
+        {player.role}
+      </Text>
+      <Text style={styles.credits}>
+        {Number(player.credits || 0).toFixed(1)} cr
+      </Text>
+    </View>
     <View style={[styles.addButton, selected && styles.selectedButton]}>
-      <Ionicons name={selected ? 'remove' : 'add'} size={22} color={colors.black} />
+      <Ionicons name={selected ? 'checkmark' : 'add'} size={20} color={selected ? colors.textInverse : colors.black} />
     </View>
   </Pressable>
 );
@@ -41,20 +45,21 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 66,
+    minHeight: 70,
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
-    backgroundColor: 'rgba(6, 12, 15, 0.54)',
+    backgroundColor: 'rgba(6, 12, 15, 0.4)',
   },
   selectedCard: {
-    backgroundColor: 'rgba(85, 255, 23, 0.11)',
+    backgroundColor: 'rgba(232, 181, 58, 0.10)',
+    borderBottomColor: colors.border,
   },
   disabledCard: {
-    opacity: 0.72,
+    opacity: 0.6,
   },
   pressedCard: {
-    opacity: 0.86,
+    opacity: 0.85,
   },
   info: {
     flex: 1,
@@ -63,43 +68,36 @@ const styles = StyleSheet.create({
   },
   name: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
+    ...typography.subtitle,
   },
   meta: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
+    ...typography.micro,
     marginTop: 2,
   },
+  tags: {
+    alignItems: 'flex-end',
+    marginRight: spacing.md,
+    gap: 2,
+  },
   role: {
-    width: 76,
-    color: colors.primary,
-    fontSize: 12,
-    fontWeight: '900',
-    textAlign: 'center',
+    color: colors.accent,
+    ...typography.micro,
   },
   credits: {
-    width: 48,
-    color: colors.text,
-    fontSize: 15,
-    fontWeight: '900',
-    textAlign: 'right',
-    marginRight: spacing.md,
+    color: colors.primary,
+    ...typography.caption,
   },
   addButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.45,
-    shadowRadius: 10,
   },
   selectedButton: {
-    backgroundColor: colors.coin,
+    backgroundColor: colors.success,
   },
 });
 

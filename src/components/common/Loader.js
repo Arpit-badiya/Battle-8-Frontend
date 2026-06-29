@@ -12,13 +12,13 @@ const Loader = ({ label = 'Loading arena', fullScreen = false }) => {
       Animated.sequence([
         Animated.timing(pulse, {
           toValue: 1,
-          duration: 900,
+          duration: 1000,
           easing: Easing.out(Easing.quad),
           useNativeDriver: true,
         }),
         Animated.timing(pulse, {
           toValue: 0,
-          duration: 900,
+          duration: 1000,
           easing: Easing.in(Easing.quad),
           useNativeDriver: true,
         }),
@@ -35,16 +35,16 @@ const Loader = ({ label = 'Loading arena', fullScreen = false }) => {
   });
   const opacity = pulse.interpolate({
     inputRange: [0, 1],
-    outputRange: [0.45, 1],
+    outputRange: [0.4, 0.85],
   });
 
   return (
     <View style={[styles.container, fullScreen && styles.fullScreen]}>
       <Animated.View style={[styles.glow, { opacity, transform: [{ scale }] }]} />
       <Animated.View style={{ transform: [{ scale }] }}>
-        <BrandLogo size={84} glow />
+        <BrandLogo size={80} glow />
       </Animated.View>
-      <Text style={styles.label}>{label}</Text>
+      {!!label && <Text style={styles.label}>{label}</Text>}
     </View>
   );
 };
@@ -68,10 +68,10 @@ const styles = StyleSheet.create({
   },
   glow: {
     position: 'absolute',
-    width: 124,
-    height: 124,
-    borderRadius: 62,
-    backgroundColor: 'rgba(177,255,0,0.14)',
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: 'rgba(232, 181, 58, 0.12)',
   },
 });
 

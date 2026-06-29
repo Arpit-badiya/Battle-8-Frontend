@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import BrandLogo from './BrandLogo';
 import colors from '../../constants/colors';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 
 const Header = ({ title, onBack, right, centered = true, branded = false }) => (
   <View style={styles.header}>
@@ -27,22 +28,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.screen,
   },
   side: {
-    width: 56,
+    width: 48,
     justifyContent: 'center',
   },
   right: {
     alignItems: 'flex-end',
   },
   iconButton: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
   },
   title: {
     flex: 1,
     color: colors.text,
-    fontSize: 17,
-    fontWeight: '900',
+    ...typography.title,
     textAlign: 'center',
   },
   leftTitle: {

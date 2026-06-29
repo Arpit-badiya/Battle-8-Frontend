@@ -1,14 +1,23 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
-import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BrandLogo from '../../components/common/BrandLogo';
 import Button from '../../components/common/Button';
+import GlassCard from '../../components/common/GlassCard';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
 import typography from '../../constants/typography';
 import useAuth from '../../hooks/useAuth';
+
+const SocialButton = ({ icon, label, onPress, loading }) => (
+  <Pressable onPress={onPress} disabled={loading} style={[styles.socialButton, loading && styles.socialDisabled]}>
+    {icon}
+    <Text style={[styles.socialLabel, loading && styles.socialDisabledText]}>{loading ? 'Please wait...' : label}</Text>
+  </Pressable>
+);
 
 const LoginScreen = () => {
   const [referralCode, setReferralCode] = useState('');
@@ -27,34 +36,47 @@ const LoginScreen = () => {
       <SafeAreaView style={styles.safe}>
         <View style={styles.content}>
           <View style={styles.brandMark}>
-            <BrandLogo size={82} glow />
+            <BrandLogo size={96} glow />
           </View>
-          <Text style={styles.title}>Join Contests. Win Coins.</Text>
-          <Text style={styles.subtitle}>Create your esports squad and enter live coin battles.</Text>
 
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>Welcome to Battle-8</Text>
-            <Text style={styles.panelSub}>Use your Google account to continue securely.</Text>
+          <View style={styles.titleWrap}>
+            <Text style={styles.title}>
+              Battle<Text style={styles.titleAccent}>8</Text>
+            </Text>
+            <Text style={styles.subtitle}>Join contests. Build teams. Win coins.</Text>
+          </View>
 
-            <View style={styles.inputWrap}>
-              <Ionicons name="gift" size={20} color={colors.textMuted} />
+          <GlassCard style={styles.panel} glow>
+            <Text style={styles.panelTitle}>Welcome back</Text>
+            <Text style={styles.panelSub}>Sign in securely with your Google account to continue.</Text>
+
+            <SocialButton
+              icon={<Ionicons name="logo-google" size={20} color={colors.text} />}
+              label="Continue with Google"
+              onPress={handleGoogleLogin}
+              loading={loading}
+            />
+
+            <View style={styles.divider}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or</Text>
+              <View style={styles.dividerLine} />
+            </View>
+
+            <View style={styles.referralBox}>
+              <Ionicons name="gift-outline" size={18} color={colors.primary} />
               <TextInput
                 value={referralCode}
                 onChangeText={setReferralCode}
                 autoCapitalize="characters"
                 placeholder="Referral code (optional)"
                 placeholderTextColor={colors.textDim}
-                style={styles.input}
+                style={styles.referralInput}
               />
             </View>
+          </GlassCard>
 
-            <Button
-              title="Continue with Google"
-              loading={loading}
-              onPress={handleGoogleLogin}
-              icon={<Ionicons name="logo-google" size={18} color={colors.white} />}
-            />
-          </View>
+          <Text style={styles.footerNote}>Secure sign-in powered by Google</Text>
         </View>
       </SafeAreaView>
     </LinearGradient>
@@ -72,63 +94,105 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     paddingHorizontal: spacing.screen,
+    alignItems: 'center',
   },
   brandMark: {
-    width: 82,
-    height: 82,
+    width: 96,
+    height: 96,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xxl,
+    marginBottom: spacing.xl,
+  },
+  titleWrap: {
+    alignItems: 'center',
+    marginBottom: spacing.xxxl,
   },
   title: {
-    ...typography.h1,
+    ...typography.display,
     color: colors.text,
-    maxWidth: 320,
     textTransform: 'uppercase',
+  },
+  titleAccent: {
+    color: colors.primary,
   },
   subtitle: {
     ...typography.body,
     color: colors.textMuted,
-    marginTop: spacing.sm,
-    marginBottom: spacing.xxxl,
-    maxWidth: 300,
-    lineHeight: 22,
+    marginTop: spacing.xs,
   },
   panel: {
+    width: '100%',
     padding: spacing.xl,
-    borderRadius: spacing.radius,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
     gap: spacing.lg,
   },
   panelTitle: {
+    ...typography.h3,
     color: colors.text,
-    fontSize: 18,
-    fontWeight: '900',
+    textAlign: 'center',
   },
   panelSub: {
+    ...typography.bodySmall,
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
-    lineHeight: 20,
+    textAlign: 'center',
   },
-  inputWrap: {
-    height: 54,
-    borderRadius: 12,
+  socialButton: {
+    minHeight: 52,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.backgroundSoft,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  socialDisabled: {
+    opacity: 0.6,
+  },
+  socialDisabledText: {
+    color: colors.textDim,
+  },
+  socialLabel: {
+    ...typography.button,
+    color: colors.text,
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.md,
   },
-  input: {
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.borderSoft,
+  },
+  dividerText: {
+    ...typography.caption,
+    color: colors.textDim,
+    textTransform: 'uppercase',
+  },
+  referralBox: {
+    minHeight: 50,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.borderSoft,
+    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  referralInput: {
     flex: 1,
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '700',
+    ...typography.body,
+    paddingVertical: spacing.sm,
+  },
+  footerNote: {
+    ...typography.caption,
+    color: colors.textDim,
+    marginTop: spacing.xl,
   },
 });
 

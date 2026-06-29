@@ -1,11 +1,15 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Button from '../../components/common/Button';
 import GlassCard from '../../components/common/GlassCard';
 import Header from '../../components/common/Header';
 import Screen from '../../components/common/Screen';
+import StatusChip from '../../components/common/StatusChip';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import { showError } from '../../utils/feedback';
 
@@ -25,14 +29,8 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
   const [captain, setCaptain] = useState('');
   const [viceCaptain, setViceCaptain] = useState('');
 
-  // Guard: only validate params once on mount, not on every re-render.
-  // Using a ref prevents the navigation.goBack() from firing again if the
-  // navigation object reference changes between renders.
   const validatedRef = useRef(false);
-  const playerIds = useMemo(
-    () => [...new Set(selectedPlayerIds.map(String))],
-    [selectedPlayerIds]
-  );
+  const playerIds = useMemo(() => [...new Set(selectedPlayerIds.map(String))], [selectedPlayerIds]);
   const hasValidSelection =
     playerIds.length === MAX_PLAYERS && selectedPlayers.length === MAX_PLAYERS;
 
@@ -47,8 +45,7 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
         [{ text: 'OK', onPress: () => navigation.goBack() }]
       );
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally empty — run once on mount only
+  }, [contestId, hasValidSelection, navigation]);
 
   const confirmTeam = async () => {
     if (!contestId || !hasValidSelection) {
@@ -92,12 +89,32 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
     <Screen>
       <Header title="Captain & Vice-Captain" onBack={() => navigation.goBack()} />
 
-      <GlassCard style={styles.summary}>
-        <Text style={styles.title}>{contest?.title || 'Contest Team'}</Text>
-        <Text style={styles.meta}>
-          {selectedTeamName || 'Selected Players'} | {Number(totalCredits || 0).toFixed(1)} credits
-        </Text>
+      <GlassCard style={styles.infoCard} glow>
+        <View style={styles.infoRow}>
+          <View style={[styles.multiplierBadge, styles.captainBadge]}>
+            <Text style={styles.multiplierText}>C</Text>
+          </View>
+          <View style={styles.infoCopy}>
+            <Text style={styles.infoTitle}>Captain gets 2x points</Text>
+            <Text style={styles.infoSub}>Pick your most reliable performer</Text>
+          </View>
+        </View>
+        <View style={styles.infoRow}>
+          <View style={[styles.multiplierBadge, styles.vcBadge]}>
+            <Text style={styles.multiplierText}>VC</Text>
+          </View>
+          <View style={styles.infoCopy}>
+            <Text style={styles.infoTitle}>Vice-Captain gets 1.5x points</Text>
+            <Text style={styles.infoSub}>Your second best choice</Text>
+          </View>
+        </View>
+        <StatusChip status={contest?.status || 'upcoming'} style={styles.statusChip} />
       </GlassCard>
+
+      <View style={styles.tipBanner}>
+        <Ionicons name="bulb-outline" size={18} color={colors.primary} />
+        <Text style={styles.tipText}>Captain and Vice-Captain must be different players.</Text>
+      </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {selectedPlayers.map((player) => {
@@ -108,31 +125,35 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
           return (
             <GlassCard key={playerId} style={styles.playerRow}>
               <View style={styles.playerMain}>
-                <Text numberOfLines={1} style={styles.playerName}>{player.name}</Text>
+                <Text numberOfLines={1} style={styles.playerName}>
+                  {player.name}
+                </Text>
                 <Text numberOfLines={1} style={styles.playerMeta}>
-                  {player.team} | {player.role}
+                  {player.team || selectedTeamName} · {player.role}
                 </Text>
               </View>
 
-              <Pressable
-                onPress={() => {
-                  setCaptain(playerId);
-                  if (viceCaptain === playerId) setViceCaptain('');
-                }}
-                style={[styles.pickButton, isCaptain && styles.pickButtonActive]}
-              >
-                <Text style={[styles.pickText, isCaptain && styles.pickTextActive]}>C</Text>
-              </Pressable>
+              <View style={styles.picks}>
+                <Pressable
+                  onPress={() => {
+                    setCaptain(playerId);
+                    if (viceCaptain === playerId) setViceCaptain('');
+                  }}
+                  style={[styles.pickButton, isCaptain && styles.pickButtonActiveCaptain]}
+                >
+                  <Text style={[styles.pickText, isCaptain && styles.pickTextActive]}>C</Text>
+                </Pressable>
 
-              <Pressable
-                onPress={() => {
-                  setViceCaptain(playerId);
-                  if (captain === playerId) setCaptain('');
-                }}
-                style={[styles.pickButton, isViceCaptain && styles.pickButtonActive]}
-              >
-                <Text style={[styles.pickText, isViceCaptain && styles.pickTextActive]}>VC</Text>
-              </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setViceCaptain(playerId);
+                    if (captain === playerId) setCaptain('');
+                  }}
+                  style={[styles.pickButton, isViceCaptain && styles.pickButtonActiveVc]}
+                >
+                  <Text style={[styles.pickText, isViceCaptain && styles.pickTextActive]}>VC</Text>
+                </Pressable>
+              </View>
             </GlassCard>
           );
         })}
@@ -141,7 +162,7 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
 
       <View style={styles.footer}>
         <Button
-          title="Confirm Team"
+          title="Preview Team"
           loading={creatingTeam}
           disabled={
             creatingTeam ||
@@ -158,29 +179,75 @@ const CaptainSelectionScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
-  summary: {
+  infoCard: {
     marginHorizontal: spacing.screen,
     marginTop: spacing.md,
     padding: spacing.lg,
-    gap: spacing.xs,
+    gap: spacing.md,
   },
-  title: {
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  multiplierBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  captainBadge: {
+    backgroundColor: colors.primarySoft,
+    borderColor: colors.primary,
+  },
+  vcBadge: {
+    backgroundColor: colors.accentSoft,
+    borderColor: colors.accent,
+  },
+  multiplierText: {
+    ...typography.subtitle,
+  },
+  infoCopy: {
+    flex: 1,
+  },
+  infoTitle: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '900',
+    ...typography.bodySmall,
   },
-  meta: {
+  infoSub: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '800',
+    ...typography.micro,
+    marginTop: 2,
+  },
+  statusChip: {
+    alignSelf: 'flex-start',
+  },
+  tipBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: spacing.screen,
+    marginTop: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.primarySoft,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  tipText: {
+    color: colors.text,
+    ...typography.caption,
   },
   content: {
     padding: spacing.screen,
-    gap: spacing.sm,
     paddingBottom: 112,
+    gap: spacing.sm,
   },
   playerRow: {
-    minHeight: 62,
+    minHeight: 66,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
@@ -192,36 +259,41 @@ const styles = StyleSheet.create({
   },
   playerName: {
     color: colors.text,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.subtitle,
   },
   playerMeta: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
+    ...typography.micro,
     marginTop: 2,
+  },
+  picks: {
+    flexDirection: 'row',
+    gap: spacing.sm,
   },
   pickButton: {
     width: 42,
-    height: 36,
-    borderRadius: 9,
+    height: 42,
+    borderRadius: 21,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
   },
-  pickButtonActive: {
+  pickButtonActiveCaptain: {
     borderColor: colors.primary,
-    backgroundColor: 'rgba(85,255,23,0.14)',
+    backgroundColor: colors.primary,
+  },
+  pickButtonActiveVc: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
   pickText: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '900',
+    ...typography.caption,
   },
   pickTextActive: {
-    color: colors.primary,
+    color: colors.textInverse,
   },
   footerSpace: {
     height: 80,

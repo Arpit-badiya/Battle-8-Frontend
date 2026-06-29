@@ -1,5 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
 
 const NetworkBanner = ({ network }) => {
@@ -20,7 +21,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: 10,
+    borderRadius: radius.md,
     backgroundColor: 'rgba(255, 61, 49, 0.14)',
     borderWidth: 1,
     borderColor: 'rgba(255, 61, 49, 0.32)',

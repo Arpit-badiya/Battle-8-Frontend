@@ -10,7 +10,9 @@ import Loader from '../../components/common/Loader';
 import Screen from '../../components/common/Screen';
 import NamePromptModal from '../../components/profile/NamePromptModal';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAuth from '../../hooks/useAuth';
 import { applyReferralCode } from '../../services/profileService';
 import { showError, showSuccess } from '../../utils/feedback';
@@ -20,6 +22,17 @@ const Stat = ({ label, value }) => (
     <Text style={styles.statValue}>{value}</Text>
     <Text style={styles.statLabel}>{label}</Text>
   </View>
+);
+
+const MenuItem = ({ icon, label, right, onPress }) => (
+  <Pressable style={styles.menuItem} onPress={onPress}>
+    <View style={styles.menuIconWrap}>
+      <Ionicons name={icon} size={18} color={colors.text} />
+    </View>
+    <Text style={styles.menuText}>{label}</Text>
+    {!!right && <Text style={styles.reward}>{right}</Text>}
+    <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+  </Pressable>
 );
 
 const ProfileScreen = ({ navigation }) => {
@@ -124,7 +137,7 @@ const ProfileScreen = ({ navigation }) => {
       ) : (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
           <View style={styles.profileHero}>
-            <GameAvatar name={displayName} size={104} />
+            <GameAvatar name={displayName} size={96} />
             <Text numberOfLines={1} style={styles.name}>{displayName}</Text>
             <Text style={styles.email}>{user?.email || 'Player'}</Text>
           </View>
@@ -175,22 +188,9 @@ const ProfileScreen = ({ navigation }) => {
           </GlassCard>
 
           <GlassCard style={styles.menu}>
-            <Pressable style={styles.menuItem} onPress={() => setEditing(true)}>
-              <Ionicons name="person-outline" size={20} color={colors.text} />
-              <Text style={styles.menuText}>Edit Profile</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-            </Pressable>
-            {[
-              ['help-circle-outline', 'Help & Support', '', () => openStackScreen('HelpSupport')],
-              ['reader-outline', 'Terms & Conditions', '', () => openStackScreen('Terms')],
-            ].map(([icon, label, right, onPress]) => (
-              <Pressable key={label} style={styles.menuItem} onPress={onPress}>
-                <Ionicons name={icon} size={20} color={colors.text} />
-                <Text style={styles.menuText}>{label}</Text>
-                {!!right && <Text style={styles.reward}>{right}</Text>}
-                <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
-              </Pressable>
-            ))}
+            <MenuItem icon="person-outline" label="Edit Profile" onPress={() => setEditing(true)} />
+            <MenuItem icon="help-circle-outline" label="Help & Support" onPress={() => openStackScreen('HelpSupport')} />
+            <MenuItem icon="reader-outline" label="Terms & Conditions" onPress={() => openStackScreen('Terms')} />
           </GlassCard>
 
           <Button title="Logout" variant="purple" onPress={logout} style={styles.logout} />
@@ -225,8 +225,7 @@ const styles = StyleSheet.create({
   },
   title: {
     color: colors.text,
-    fontSize: 20,
-    fontWeight: '900',
+    ...typography.h2,
   },
   profileHero: {
     alignItems: 'center',
@@ -235,14 +234,12 @@ const styles = StyleSheet.create({
   name: {
     maxWidth: '90%',
     color: colors.text,
-    fontSize: 22,
-    fontWeight: '900',
+    ...typography.h2,
     marginTop: spacing.md,
   },
   email: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
+    ...typography.caption,
     marginTop: 2,
   },
   stats: {
@@ -263,22 +260,20 @@ const styles = StyleSheet.create({
   },
   referralTitle: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '900',
+    ...typography.title,
   },
   referralSub: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
+    ...typography.caption,
     marginTop: 3,
     maxWidth: 260,
   },
   referralCodeBox: {
     minHeight: 50,
-    borderRadius: 10,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.borderSoft,
-    backgroundColor: 'rgba(177,255,0,0.07)',
+    borderColor: colors.border,
+    backgroundColor: colors.primarySoft,
     paddingHorizontal: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
@@ -288,9 +283,7 @@ const styles = StyleSheet.create({
   referralCode: {
     flex: 1,
     color: colors.primary,
-    fontSize: 17,
-    fontWeight: '900',
-    letterSpacing: 0,
+    ...typography.h3,
   },
   referralActions: {
     flexDirection: 'row',
@@ -299,7 +292,7 @@ const styles = StyleSheet.create({
   smallAction: {
     width: 34,
     height: 34,
-    borderRadius: 9,
+    borderRadius: radius.sm,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.surface,
@@ -315,27 +308,26 @@ const styles = StyleSheet.create({
   },
   referralInput: {
     flex: 1,
-    minHeight: 44,
-    borderRadius: 10,
+    minHeight: 46,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: colors.borderSoft,
     backgroundColor: colors.surface,
     color: colors.text,
     paddingHorizontal: spacing.md,
-    fontWeight: '800',
+    ...typography.bodySmall,
   },
   applyButton: {
     minWidth: 78,
-    minHeight: 44,
-    borderRadius: 10,
+    minHeight: 46,
+    borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryDark,
+    backgroundColor: colors.primary,
   },
   applyText: {
-    color: colors.white,
-    fontSize: 12,
-    fontWeight: '900',
+    color: colors.textInverse,
+    ...typography.micro,
   },
   stat: {
     flex: 1,
@@ -343,12 +335,11 @@ const styles = StyleSheet.create({
   },
   statValue: {
     color: colors.text,
-    fontSize: 20,
-    fontWeight: '900',
+    ...typography.h2,
   },
   statLabel: {
     color: colors.textMuted,
-    fontSize: 11,
+    ...typography.micro,
     textAlign: 'center',
     marginTop: spacing.xs,
   },
@@ -364,16 +355,22 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.borderSoft,
   },
+  menuIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+  },
   menuText: {
     flex: 1,
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '800',
+    ...typography.body,
   },
   reward: {
     color: colors.primary,
-    fontSize: 12,
-    fontWeight: '900',
+    ...typography.micro,
   },
   logout: {
     marginTop: spacing.xxl,

@@ -1,18 +1,22 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Badge from '../common/Badge';
 import Button from '../common/Button';
 import CoinBadge from '../common/CoinBadge';
 import GlassCard from '../common/GlassCard';
+import StatusChip from '../common/StatusChip';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import { getJoinProgress } from '../../utils/helpers';
 
 const ContestCard = ({
   contest,
   onJoin,
   onPress,
-  cta = 'Join',
+  cta = 'Build Team',
   showChevron = false,
   loading = false,
   disabled = false,
@@ -40,336 +44,197 @@ const ContestCard = ({
     return () => clearInterval(interval);
   }, [contest.status, startAtMs]);
 
-  const progress = getJoinProgress(
-    contest.joined,
-    contest.totalSpots || contest.players
-  );
-
   const totalSpots = Number(contest.totalSpots || contest.players || 0);
   const joinedSpots = Number(contest.joined || 0);
+  const remainingSlots = contest.remainingSlots ?? Math.max(totalSpots - joinedSpots, 0);
+  const progress = getJoinProgress(contest.joined, contest.totalSpots || contest.players);
 
-  const remainingSlots =
-    contest.remainingSlots ??
-    Math.max(
-      totalSpots -
-        joinedSpots,
-      0
-    );
-
-  const isFull = remainingSlots <= 0;
   const effectiveStatus =
     contest.status === 'upcoming' && startAtMs && now >= startAtMs
       ? 'live'
       : contest.status || 'upcoming';
+
   const isClosed = ['live', 'completed', 'cancelled'].includes(effectiveStatus);
+  const isFull = remainingSlots <= 0;
   const isDisabled = disabled || (!contest.userJoined && isFull) || isClosed;
   const buttonTitle = contest.teamCreated
-    ? 'Team Created'
+    ? 'View Team'
     : effectiveStatus === 'live'
     ? 'Live'
     : contest.userJoined
-    ? 'Create Team'
+    ? cta
     : isClosed
     ? 'Closed'
     : isFull
     ? 'Full'
     : cta;
-  const msRemaining = Math.max(startAtMs - now, 0);
+
   const countdown = useMemo(() => {
     if (!startAtMs || effectiveStatus !== 'upcoming') {
       return contest.timeLeft || '00:00:00';
     }
 
-    const totalSeconds = Math.floor(msRemaining / 1000);
+    const totalSeconds = Math.max(Math.floor((startAtMs - now) / 1000), 0);
     const hours = String(Math.floor(totalSeconds / 3600)).padStart(2, '0');
     const minutes = String(Math.floor((totalSeconds % 3600) / 60)).padStart(2, '0');
     const seconds = String(totalSeconds % 60).padStart(2, '0');
 
     return `${hours}:${minutes}:${seconds}`;
-  }, [contest.timeLeft, effectiveStatus, msRemaining, startAtMs]);
-  const statusBadge =
+  }, [contest.timeLeft, effectiveStatus, now, startAtMs]);
+
+  const statusTone =
     effectiveStatus === 'completed'
-      ? 'Completed'
+      ? 'completed'
       : effectiveStatus === 'live'
-      ? 'Live'
+      ? 'live'
       : remainingSlots < 20
-      ? 'Filling Fast'
-      : 'Hot';
-  const payoutPreview = [
-    ['1', 0.5],
-    ['2', 0.3],
-    ['3', 0.2],
-  ].map(([rank, share]) => ({
-    rank,
-    amount: Math.round(Number(contest.prizePool || 0) * share * 100) / 100,
-  }));
+      ? 'hot'
+      : 'upcoming';
+
+  const firstPrize = Math.round(Number(contest.prizePool || 0) * 0.5 * 100) / 100;
 
   return (
     <GlassCard style={styles.card}>
-      <View style={styles.topRow}>
-        <Text style={styles.title}>
-          {contest.title ||
-            `${contest.players} Players Contest`}
-        </Text>
-
-        <Text
-          style={[
-            styles.badge,
-            effectiveStatus === 'live' && styles.liveBadge,
-            effectiveStatus === 'completed' && styles.completedBadge,
-            effectiveStatus === 'upcoming' && remainingSlots < 20 && styles.fastBadge,
-          ]}
-        >
-          {statusBadge}
-        </Text>
-
-        {showChevron && (
-          <Ionicons
-            name="chevron-forward"
-            size={24}
-            color={colors.textDim}
-            onPress={onPress}
-          />
-        )}
-      </View>
-
-      <View style={styles.metricsRow}>
-        <View style={styles.metricBlock}>
-          <Text style={styles.label}>
-            Entry
-          </Text>
-
-          <CoinBadge
-            amount={contest.entryFee}
-            compact
-          />
-        </View>
-
-        <View style={[styles.metricBlock, styles.spotsBlock]}>
-          <Text style={styles.label}>
-            Spots
-          </Text>
-
-          <Text style={styles.metric}>
-            <Text style={styles.gold}>
-              {joinedSpots}
+      <Pressable onPress={onPress} style={styles.pressable}>
+        <View style={styles.topRow}>
+          <View style={styles.titleWrap}>
+            <Text numberOfLines={2} style={styles.title}>
+              {contest.title || `${contest.players} Players Contest`}
             </Text>
+            <View style={styles.badges}>
+              <Badge label={contest.game || contest.gameName || 'Battle-8'} tone="gold" compact />
+              {remainingSlots < 20 && <Badge label="HOT" tone="danger" compact />}
+              {contest.guaranteed && <Badge label="GUARANTEED" tone="blue" compact />}
+            </View>
+          </View>
+          <StatusChip status={statusTone} compact />
+        </View>
 
-            {' / '}
+        <View style={styles.prizeRow}>
+            <View style={styles.prizeBlock}>
+              <Text style={styles.prizeLabel}>Prize Pool</Text>
+              <CoinBadge amount={contest.prizePool} compact />
+            </View>
+            <View style={styles.prizeBlock}>
+              <Text style={styles.prizeLabel}>1st Prize</Text>
+              <Text style={styles.prizeValue}>{firstPrize}</Text>
+            </View>
+        </View>
 
-            {totalSpots}
-          </Text>
-
-          <Text style={styles.slots}>
-            {joinedSpots} / {totalSpots} Spots
+        <View style={styles.progressWrap}>
+          <View style={styles.progressTrack}>
+            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+          </View>
+          <Text style={styles.spotsText}>
+            {joinedSpots}/{totalSpots} spots filled
           </Text>
         </View>
 
-        <View style={styles.metricBlock}>
-          <Text style={styles.label}>
-            Prize Pool
-          </Text>
+        <View style={styles.bottomRow}>
+          <View style={styles.entryWrap}>
+            <Text style={styles.entryLabel}>Entry</Text>
+            <CoinBadge amount={contest.entryFee} compact />
+          </View>
 
-          <CoinBadge
-            amount={contest.prizePool}
-            compact
-          />
+          {!showChevron ? (
+            <Button
+              title={buttonTitle}
+              onPress={onJoin}
+              style={styles.joinButton}
+              fullWidth={false}
+              loading={loading}
+              disabled={isDisabled}
+            />
+          ) : (
+            <Ionicons name="chevron-forward" size={22} color={colors.textMuted} />
+          )}
         </View>
-      </View>
-
-      <View style={styles.progressTrack}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${
-                progress * 100
-              }%`,
-            },
-          ]}
-        />
-      </View>
-
-      <View style={styles.payoutRow}>
-        {payoutPreview.map((item) => (
-          <Text key={item.rank} style={styles.payoutText}>
-            #{item.rank} {item.amount}
-          </Text>
-        ))}
-      </View>
-
-      <View style={styles.bottomRow}>
-        <View style={styles.time}>
-          <Ionicons
-            name="time-outline"
-            size={16}
-            color={colors.text}
-          />
-
-          <Text style={styles.timeText}>
-            {effectiveStatus === 'live'
-              ? 'Match Live'
-              : effectiveStatus === 'completed'
-              ? 'Completed'
-              : `${countdown} Left`}
-          </Text>
-        </View>
-
-        {!showChevron && (
-          <Button
-          title={
-              buttonTitle
-            }
-            onPress={onJoin}
-            style={styles.joinButton}
-            loading={loading}
-            disabled={isDisabled}
-          />
-        )}
-      </View>
+      </Pressable>
     </GlassCard>
   );
 };
 
 const styles = StyleSheet.create({
   card: {
-    padding: spacing.lg,
     marginBottom: spacing.md,
   },
-
+  pressable: {
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.md,
   },
-
-  title: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 16,
-    fontWeight: '900',
-  },
-
-  badge: {
-    overflow: 'hidden',
-    borderRadius: 10,
-    backgroundColor:
-      colors.danger,
-    color: colors.white,
-    fontSize: 10,
-    fontWeight: '900',
-    paddingHorizontal:
-      spacing.sm,
-    paddingVertical: 3,
-    textTransform: 'uppercase',
-  },
-
-  fastBadge: {
-    backgroundColor: '#0752b8',
-  },
-
-  liveBadge: {
-    backgroundColor: colors.primaryDark,
-  },
-
-  completedBadge: {
-    backgroundColor: colors.textMuted,
-  },
-
-  metricsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent:
-      'space-between',
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-
-  metricBlock: {
+  titleWrap: {
     flex: 1,
     minWidth: 0,
+    gap: spacing.xs,
   },
-
-  spotsBlock: {
-    alignItems: 'center',
-  },
-
-  label: {
-    color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: spacing.xs,
-  },
-
-  metric: {
+  title: {
     color: colors.text,
-    fontSize: 16,
-    fontWeight: '900',
+    ...typography.title,
   },
-
-  gold: {
-    color: colors.coin,
+  badges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
   },
-
-  slots: {
+  prizeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  prizeBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  prizeLabel: {
     color: colors.textMuted,
-    fontSize: 11,
-    marginTop: 2,
-    fontWeight: '700',
-    textAlign: 'center',
+    ...typography.micro,
   },
-
+  prizeValue: {
+    color: colors.primary,
+    ...typography.subtitle,
+  },
+  progressWrap: {
+    gap: spacing.xs,
+  },
   progressTrack: {
-    height: 2,
-    borderRadius: 2,
-    backgroundColor:
-      'rgba(255,255,255,0.08)',
+    height: 6,
+    borderRadius: radius.pill,
+    backgroundColor: 'rgba(255,255,255,0.08)',
     overflow: 'hidden',
-    marginTop: spacing.lg,
   },
-
   progressFill: {
     height: '100%',
-    borderRadius: 2,
-    backgroundColor:
-      colors.primary,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
   },
-
+  spotsText: {
+    color: colors.textSubtle,
+    ...typography.micro,
+  },
   bottomRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent:
-      'space-between',
-    marginTop: spacing.lg,
-  },
-  payoutRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.sm,
     gap: spacing.sm,
   },
-  payoutText: {
-    flex: 1,
-    color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-
-  time: {
-    flex: 1,
+  entryWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    gap: spacing.sm,
   },
-
-  timeText: {
-    color: colors.text,
-    fontWeight: '800',
-    fontSize: 12,
+  entryLabel: {
+    color: colors.textMuted,
+    ...typography.caption,
   },
-
   joinButton: {
-    width: 118,
+    minWidth: 120,
   },
 });
 

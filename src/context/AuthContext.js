@@ -72,18 +72,40 @@ const decodeBase64Url = (value = '') => {
 
 const isJwtExpired = (jwtToken) => {
   try {
-    const [, payload] = String(jwtToken || '').split('.');
-
-    if (!payload) {
-      return true;
-    }
-
-    const decoded = JSON.parse(decodeBase64Url(payload));
+    const decoded = getJwtPayload(jwtToken);
 
     return decoded.exp ? decoded.exp * 1000 <= Date.now() : false;
   } catch (error) {
     return true;
   }
+};
+
+const getJwtPayload = (jwtToken) => {
+  const [, payload] = String(jwtToken || '').split('.');
+
+  if (!payload) {
+    return {};
+  }
+
+  return JSON.parse(decodeBase64Url(payload));
+};
+
+const normalizeAuthUser = (nextUser, jwtToken) => {
+  if (!nextUser) {
+    return null;
+  }
+
+  const payload = getJwtPayload(jwtToken);
+  const id = nextUser._id || nextUser.id || payload.id || '';
+
+  return {
+    ...nextUser,
+    _id: id,
+    id,
+    email: nextUser.email || '',
+    name: nextUser.name || '',
+    role: nextUser.role || payload.role || 'user',
+  };
 };
 
 export const AuthProvider = ({ children }) => {
@@ -105,9 +127,25 @@ export const AuthProvider = ({ children }) => {
       try {
         const saved = await getAuthSession();
         if (saved?.token && saved?.user && !isJwtExpired(saved.token)) {
-          setUser(saved.user);
+          const savedUser = normalizeAuthUser(saved.user, saved.token);
+          setUser(savedUser);
           setToken(saved.token);
           setAuthToken(saved.token);
+
+          try {
+            const response = await requestProfile();
+            if (response?.user) {
+              const freshUser = normalizeAuthUser(response.user, saved.token);
+              setUser(freshUser);
+              await saveAuthSession({ user: freshUser, token: saved.token });
+            } else if (savedUser?.role !== saved.user.role || savedUser?._id !== saved.user._id) {
+              await saveAuthSession({ user: savedUser, token: saved.token });
+            }
+          } catch (error) {
+            if (savedUser?.role !== saved.user.role || savedUser?._id !== saved.user._id) {
+              await saveAuthSession({ user: savedUser, token: saved.token });
+            }
+          }
         } else if (saved?.token) {
           await clearAuthSession();
         }
@@ -128,12 +166,13 @@ export const AuthProvider = ({ children }) => {
 
   const persistSession = useCallback(
     async ({ user: nextUser, token: nextToken = token }) => {
-      setUser(nextUser);
+      const normalizedUser = normalizeAuthUser(nextUser, nextToken);
+      setUser(normalizedUser);
 
       if (nextToken) {
         setToken(nextToken);
         setAuthToken(nextToken);
-        await saveAuthSession({ user: nextUser, token: nextToken });
+        await saveAuthSession({ user: normalizedUser, token: nextToken });
       }
     },
     [token]
@@ -178,8 +217,8 @@ export const AuthProvider = ({ children }) => {
         firebaseIdToken,
         referralCode: referralCode.trim().toUpperCase(),
       });
-      const nextUser = response.user;
       const nextToken = response.token;
+      const nextUser = normalizeAuthUser(response.user, nextToken);
 
       setUser(nextUser);
       setToken(nextToken);

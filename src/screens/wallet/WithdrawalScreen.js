@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -7,7 +8,9 @@ import Header from '../../components/common/Header';
 import Loader from '../../components/common/Loader';
 import Screen from '../../components/common/Screen';
 import colors from '../../constants/colors';
+import radius from '../../constants/radius';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 import useAppData from '../../hooks/useAppData';
 import { getWithdrawalOverview, requestWithdrawal } from '../../services/withdrawalService';
 import { showError, showSuccess } from '../../utils/feedback';
@@ -60,14 +63,20 @@ const WithdrawalScreen = ({ navigation }) => {
       ) : (
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <GlassCard style={styles.balance} glow>
+            <View style={styles.balanceHeader}>
+              <Ionicons name="wallet-outline" size={28} color={colors.primary} />
+              <Text style={styles.balanceTitle}>Withdrawal Balance</Text>
+            </View>
             <View style={styles.balanceRow}>
               <Stat label="Main Coins" value={overview?.mainCoins || 0} muted />
               <Stat label="Winning Coins" value={overview?.winningCoins || 0} />
             </View>
             <Text style={styles.inr}>Estimated value: ₹{overview?.estimatedInr || 0}</Text>
-            <Text style={styles.eligibility}>
-              {overview?.eligible ? 'Eligible for withdrawal' : `Need ${overview?.minimumCoins || 1000} winning coins and 1 paid contest join`}
-            </Text>
+            <View style={[styles.eligibilityBadge, overview?.eligible && styles.eligibleBadge]}>
+              <Text style={[styles.eligibility, overview?.eligible && styles.eligibleText]}>
+                {overview?.eligible ? 'Eligible for withdrawal' : `Need ${overview?.minimumCoins || 1000} winning coins and 1 paid contest join`}
+              </Text>
+            </View>
           </GlassCard>
 
           <GlassCard style={styles.form}>
@@ -87,9 +96,9 @@ const WithdrawalScreen = ({ navigation }) => {
           <GlassCard style={styles.history}>
             {(overview?.withdrawals || []).map((item) => (
               <View key={item.id} style={styles.historyRow}>
-                <View>
+                <View style={styles.historyMain}>
                   <Text style={styles.historyText}>{item.amountCoins} coins · ₹{item.amountInr}</Text>
-                  <Text style={styles.historyMeta}>{item.status.toUpperCase()}</Text>
+                  <Text style={[styles.historyStatus, item.status === 'paid' && styles.paidStatus]}>{item.status.toUpperCase()}</Text>
                 </View>
                 <Text style={styles.historyMeta}>{item.upiId}</Text>
               </View>
@@ -112,22 +121,30 @@ const Stat = ({ label, value, muted }) => (
 const styles = StyleSheet.create({
   content: { padding: spacing.screen, paddingBottom: 110, gap: spacing.md },
   balance: { padding: spacing.lg, gap: spacing.md },
+  balanceHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  balanceTitle: { color: colors.text, ...typography.title },
   balanceRow: { flexDirection: 'row', gap: spacing.md },
   stat: { flex: 1 },
-  statLabel: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
-  statValue: { color: colors.coin, fontSize: 24, fontWeight: '900', marginTop: spacing.xs },
+  statLabel: { color: colors.textMuted, ...typography.caption },
+  statValue: { color: colors.coin, ...typography.h2, marginTop: spacing.xs },
   muted: { color: colors.primary },
-  inr: { color: colors.text, fontSize: 15, fontWeight: '900' },
-  eligibility: { color: colors.textMuted, fontSize: 12, fontWeight: '800' },
+  inr: { color: colors.text, ...typography.body },
+  eligibilityBadge: { alignSelf: 'flex-start', backgroundColor: colors.dangerSoft, borderRadius: radius.pill, paddingHorizontal: spacing.sm, paddingVertical: 3 },
+  eligibleBadge: { backgroundColor: colors.successSoft },
+  eligibility: { color: colors.danger, ...typography.micro },
+  eligibleText: { color: colors.success },
   form: { padding: spacing.lg, gap: spacing.md },
-  title: { color: colors.text, fontSize: 17, fontWeight: '900' },
-  input: { minHeight: 48, borderRadius: 10, borderWidth: 1, borderColor: colors.borderSoft, color: colors.text, paddingHorizontal: spacing.md, fontWeight: '800', backgroundColor: colors.surface },
-  historyTitle: { color: colors.text, fontSize: 16, fontWeight: '900' },
+  title: { color: colors.text, ...typography.h3 },
+  input: { minHeight: 50, borderRadius: radius.md, borderWidth: 1, borderColor: colors.borderSoft, color: colors.text, paddingHorizontal: spacing.md, ...typography.body, backgroundColor: colors.surface },
+  historyTitle: { color: colors.text, ...typography.h3, marginTop: spacing.sm },
   history: { paddingVertical: spacing.sm },
-  historyRow: { minHeight: 58, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
-  historyText: { color: colors.text, fontWeight: '900' },
-  historyMeta: { color: colors.textMuted, fontSize: 11, fontWeight: '800', marginTop: 3 },
-  empty: { color: colors.textMuted, padding: spacing.lg, textAlign: 'center' },
+  historyRow: { minHeight: 64, paddingHorizontal: spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: colors.borderSoft },
+  historyMain: { flex: 1 },
+  historyText: { color: colors.text, ...typography.bodySmall },
+  historyStatus: { color: colors.textMuted, ...typography.micro, marginTop: 2 },
+  paidStatus: { color: colors.success },
+  historyMeta: { color: colors.textMuted, ...typography.micro, maxWidth: 120, textAlign: 'right' },
+  empty: { color: colors.textMuted, ...typography.bodySmall, padding: spacing.lg, textAlign: 'center' },
 });
 
 export default WithdrawalScreen;

@@ -1,12 +1,18 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { StyleSheet } from 'react-native';
 import colors from '../../constants/colors';
-import spacing from '../../constants/spacing';
+import radius from '../../constants/radius';
+import shadows from '../../constants/shadows';
 
-const GlassCard = ({ children, style, glow = false }) => (
+const GlassCard = ({ children, style, glow = false, bordered = true }) => (
   <LinearGradient
-    colors={glow ? ['rgba(20, 48, 18, 0.88)', 'rgba(7, 14, 17, 0.95)'] : ['rgba(16, 25, 30, 0.88)', 'rgba(5, 10, 13, 0.95)']}
-    style={[styles.card, glow && styles.glow, style]}
+    colors={glow ? ['rgba(38, 30, 12, 0.92)', 'rgba(11, 18, 23, 0.98)'] : ['rgba(17, 27, 32, 0.92)', 'rgba(11, 18, 23, 0.98)']}
+    style={[
+      styles.card,
+      glow && styles.glow,
+      !bordered && styles.noBorder,
+      style,
+    ]}
   >
     {children}
   </LinearGradient>
@@ -14,20 +20,18 @@ const GlassCard = ({ children, style, glow = false }) => (
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: spacing.radius,
+    borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.borderSoft,
-    shadowColor: colors.black,
-    shadowOpacity: 0.42,
-    shadowRadius: 20,
-    shadowOffset: { width: 0, height: 12 },
-    elevation: 8,
+    ...shadows.sm,
     overflow: 'hidden',
   },
   glow: {
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOpacity: 0.26,
+    borderColor: colors.border,
+    ...shadows.glow,
+  },
+  noBorder: {
+    borderWidth: 0,
   },
 });
 

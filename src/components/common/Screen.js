@@ -5,19 +5,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import colors from '../../constants/colors';
 
 const Particle = ({ style, delay = 0 }) => {
-  const opacity = useRef(new Animated.Value(0.15)).current;
+  const opacity = useRef(new Animated.Value(0.1)).current;
   const translate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const loop = Animated.loop(
       Animated.parallel([
         Animated.sequence([
-          Animated.timing(opacity, { toValue: 0.7, duration: 1800, delay, useNativeDriver: true }),
-          Animated.timing(opacity, { toValue: 0.15, duration: 1800, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.5, duration: 2200, delay, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.1, duration: 2200, useNativeDriver: true }),
         ]),
         Animated.sequence([
-          Animated.timing(translate, { toValue: -10, duration: 2200, delay, useNativeDriver: true }),
-          Animated.timing(translate, { toValue: 0, duration: 2200, useNativeDriver: true }),
+          Animated.timing(translate, { toValue: -8, duration: 2800, delay, useNativeDriver: true }),
+          Animated.timing(translate, { toValue: 0, duration: 2800, useNativeDriver: true }),
         ]),
       ])
     );
@@ -51,21 +51,21 @@ const styles = StyleSheet.create({
   },
   glowTop: {
     position: 'absolute',
-    top: -110,
-    right: -70,
-    width: 220,
-    height: 220,
-    borderRadius: 110,
-    backgroundColor: 'rgba(85, 255, 23, 0.11)',
+    top: -120,
+    right: -80,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(232, 181, 58, 0.08)',
   },
   glowBottom: {
     position: 'absolute',
-    bottom: -130,
-    left: -90,
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: 'rgba(255, 191, 24, 0.08)',
+    bottom: -140,
+    left: -100,
+    width: 280,
+    height: 280,
+    borderRadius: 140,
+    backgroundColor: 'rgba(255, 191, 24, 0.06)',
   },
   particle: {
     position: 'absolute',

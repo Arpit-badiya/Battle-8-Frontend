@@ -1,9 +1,11 @@
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import Badge from '../../components/common/Badge';
 import Header from '../../components/common/Header';
 import GlassCard from '../../components/common/GlassCard';
 import Screen from '../../components/common/Screen';
 import colors from '../../constants/colors';
 import spacing from '../../constants/spacing';
+import typography from '../../constants/typography';
 
 const sections = [
   ['Fantasy Contest Disclaimer', 'Battle-8 contests are skill-based esports fantasy contests. Team selection, contest entry and winnings depend on player performance, contest rules and fair participation.'],
@@ -20,8 +22,11 @@ const TermsScreen = ({ navigation }) => (
   <Screen>
     <Header title="Terms" onBack={() => navigation.goBack()} />
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-      <Text style={styles.title}>Terms & Conditions</Text>
-      <Text style={styles.subtitle}>Battle-8 beta rules for fantasy esports participation.</Text>
+      <View style={styles.hero}>
+        <Text style={styles.title}>Terms & Conditions</Text>
+        <Text style={styles.subtitle}>Battle-8 beta rules for fantasy esports participation.</Text>
+        <Badge label="Policy" tone="gold" compact />
+      </View>
       {sections.map(([title, body]) => (
         <GlassCard key={title} style={styles.card}>
           <Text style={styles.sectionTitle}>{title}</Text>
@@ -38,15 +43,17 @@ const styles = StyleSheet.create({
     paddingBottom: 96,
     gap: spacing.md,
   },
+  hero: {
+    gap: spacing.xs,
+    marginBottom: spacing.xs,
+  },
   title: {
     color: colors.text,
-    fontSize: 22,
-    fontWeight: '900',
+    ...typography.h2,
   },
   subtitle: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
+    ...typography.caption,
     marginBottom: spacing.sm,
   },
   card: {
@@ -55,14 +62,11 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     color: colors.primary,
-    fontSize: 14,
-    fontWeight: '900',
+    ...typography.subtitle,
   },
   body: {
     color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 20,
-    fontWeight: '700',
+    ...typography.bodySmall,
   },
 });
 
