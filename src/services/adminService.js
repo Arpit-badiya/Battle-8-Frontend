@@ -15,6 +15,21 @@ export const getAdminWithdrawals = async () => {
   return response.data.withdrawals || [];
 };
 
+export const getSchedulerStatus = async () => {
+  const response = await api.get('/admin/scheduler/status');
+  return response.data;
+};
+
+export const startScheduler = async () => {
+  const response = await api.post('/admin/scheduler/start');
+  return response.data;
+};
+
+export const stopScheduler = async () => {
+  const response = await api.post('/admin/scheduler/stop');
+  return response.data;
+};
+
 export const updateWithdrawalStatus = async ({ withdrawalId, status, adminNote, paymentReference }) => {
   const response = await api.post(`/admin/withdrawals/${withdrawalId}/status`, {
     status,
@@ -199,4 +214,9 @@ export const importContestResults = async ({ contestId, file }) =>
 export const getAdminLeaderboard = async (contestId) => {
   const response = await api.get(`/admin/leaderboard/${contestId}`);
   return response.data?.leaderboard || [];
+};
+
+export const getAdminContestResult = async (contestId) => {
+  const response = await api.get(`/admin/contest-results/${contestId}`);
+  return response.data;
 };

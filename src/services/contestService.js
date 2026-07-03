@@ -324,3 +324,34 @@ export const getLeaderboard =
       normalizeLeaderboardRow
     );
   };
+
+export const getContestResult =
+  async (contestId) => {
+    if (!contestId) {
+      throw new Error('Contest ID missing');
+    }
+
+    const response =
+      await api.get(
+        `/results/contest/${contestId}`
+      );
+
+    return {
+      ...response.data,
+      contest: response.data?.contest ? normalizeContest(response.data.contest) : null,
+      leaderboard: unwrapList(response.data, 'leaderboard').map(normalizeLeaderboardRow),
+    };
+  };
+
+export const getContestHistory =
+  async () => {
+    const response =
+      await api.get(
+        '/results/history'
+      );
+
+    return unwrapList(response.data, 'history').map((item) => ({
+      ...item,
+      contest: item.contest ? normalizeContest(item.contest) : null,
+    }));
+  };
